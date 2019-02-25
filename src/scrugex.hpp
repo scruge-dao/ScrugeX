@@ -3,15 +3,17 @@
 #include <eosiolib/transaction.hpp>
 #include <eosiolib/asset.hpp>
 
+#include "constants.hpp"
+#include "methods.hpp"
+
 using namespace eosio;
 using namespace std;
 
-class [[contract]] scrugex : public contract {
+CONTRACT scrugex : public contract {
 
 public:
 	using contract::contract;
 	
-	// initializer
 	scrugex(name receiver, name code, datastream<const char*> ds)
 		: contract(receiver, code, ds) {}
 
@@ -19,8 +21,7 @@ public:
 
 	void transfer(name from, name to, asset quantity, string memo);
 
-	[[eosio::action]]
-	void newcampaign(
+	ACTION newcampaign(
 		uint64_t campaignId, uint64_t founderUserId, name founderEosAccount,
 		asset softCap, asset hardCap, uint64_t initialFundsReleasePercent,
 		asset maxUserContribution, asset minUserContribution,
@@ -29,23 +30,17 @@ public:
 		uint64_t annualInflationPercentStart, uint64_t annualInflationPercentEnd,
 		vector<milestoneInfo> milestones);
 
-	[[eosio::action]]
-	void vote(name eosAccount, uint64_t userId, uint64_t campaignId, bool vote);
+	ACTION vote(name eosAccount, uint64_t userId, uint64_t campaignId, bool vote);
 
-	[[eosio::action]]
-	void extend(uint64_t campaignId);
+	ACTION extend(uint64_t campaignId);
 
-	[[eosio::action]]
-	void refresh();
+	ACTION refresh();
 
-	[[eosio::action]]
-	void destroy();
+	ACTION destroy();
 
-	[[eosio::action]]
-	void refundsend(name eosAccount);
+	ACTION send(name eosAccount);
 
-	[[eosio::action]]
-	void startrefund();
+	ACTION pay(uint64_t campaignId);
 
 private:
 
@@ -167,13 +162,13 @@ private:
 		contributions_i contributions(_self, scope);
 		for (auto& item : contributions) {
         	if (item.userId == userId) {
-         	   total += item.quantity;
+        	   total += item.quantity;
         	}
     	}
     	return total;
 	} // _getContributionQuantity
 
-	uint64_t _getScope(uint64_t campaignId) {
+	int64_t _getScope(uint64_t campaignId) {
 		campaigns_i campaigns(_self, 0);
 		auto campaignItem = campaigns.find(campaignId);
 		if (campaignItem != campaigns.end()) {
@@ -184,14 +179,14 @@ private:
 
   // structs
 
-	struct [[eosio::table]] information {
+	TABLE information {
 		uint64_t key;
 		uint64_t campaignsCount;
 
 		uint64_t primary_key() const { return key; }
 	};
 
-	struct [[eosio::table]] campaigns {
+	TABLE campaigns {
 		uint8_t status;
 		uint64_t campaignId;
 		uint64_t founderUserId;
@@ -218,7 +213,7 @@ private:
 		uint64_t primary_key() const { return campaignId; }
 	};
 
-	struct [[eosio::table]] milestones {
+	TABLE milestones {
 		uint8_t id;
 		uint64_t deadline;
 		uint64_t fundsReleasePercent;
@@ -226,20 +221,20 @@ private:
 		uint64_t primary_key() const { return id; }
 	};
 
-	struct [[eosio::table]] contribution {
+	TABLE contribution {
 		uint64_t userId;
 		name eosAccount;
 		asset quantity;
 		
 		// refund/token distribution flags
-		bool didTryToPay; // did attemt payment
-		bool isPaid; // payment was successful
+		bool attemptedPayment;  // did attemt payment
+		bool isPaid;            // payment was successful
  
 		uint64_t primary_key() const { return eosAccount.value; }
 		uint64_t by_userId() const { return userId; }
 	};
 
-	struct [[eosio::table]] voting {
+	TABLE voting {
 		uint64_t voteId;
 		uint8_t kind;			// 0 - extend, 1 - deadline
 		uint8_t milestoneId;
@@ -272,8 +267,9 @@ private:
 			indexed_by<"byuserid"_n, const_mem_fun<contribution, uint64_t,
 												   &contribution::by_userId>>> contributions_i;
 	
-	// to access verification table
-	struct [[eosio::table]] account {
+	// to access kyc/aml table
+	
+	struct account {
 		uint64_t userId;
 		name eosAccount;
 

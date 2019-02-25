@@ -1,5 +1,3 @@
-#include "constants.hpp"
-#include "methods.hpp"
 #include "scrugex.hpp"
 
 using namespace eosio;
@@ -87,7 +85,7 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 			r.eosAccount = eosAccount;
 			r.quantity = quantity;
 			
-			r.didTryToPay = false;
+			r.attemptedPayment = false;
 			r.isPaid = false;
 		});
 	}
@@ -403,11 +401,10 @@ void scrugex::refresh() {
 
 	transaction t{};
   t.actions.emplace_back(permission_level(_self, "active"_n),
-            					   _self,
-            					   "refresh"_n,
-            					   std::make_tuple());
-  t.delay_sec = 120;
-  // t.send(time_ms(), _self, true);
+            					   _self, "refresh"_n,
+            					   make_tuple());
+  t.delay_sec = 300;
+  t.send(time_ms(), _self, true);
   
 } // void scrugex::refresh
 
@@ -420,11 +417,12 @@ void scrugex::send(name eosAccount) {
   // remove from contributions
   
   // inline send money to user
-  _transfer(eosAccount, asset(1, EOS_SYMBOL), "");
+  _transfer(eosAccount, asset(1, EOS_SYMBOL), "scrugex refund for campaign -name-");
   
 } // void scrugex::send
 
-void scrugex::startrefund() {
+
+void scrugex::pay(uint64_t campaignId) {
   require_auth(_self);
   
   // assert isRefunding == true
@@ -443,7 +441,7 @@ void scrugex::startrefund() {
     transaction t{};
     t.actions.emplace_back(permission_level(_self, "active"_n),
               					   _self, "send"_n,
-              					   make_tuple());
+              					   make_tuple(  ));
     t.delay_sec = 1;
     t.send(time_ms(), _self, true);
   }
@@ -451,8 +449,8 @@ void scrugex::startrefund() {
   {
     transaction t{};
     t.actions.emplace_back(permission_level(_self, "active"_n),
-              					   _self, "startrefund"_n,
-              					   make_tuple( ));  // account
+              					   _self, "pay"_n,
+              					   make_tuple( campaignId ));
     t.delay_sec = 2;
     t.send(time_ms(), _self, true);
   }
@@ -504,8 +502,8 @@ extern "C" {
     
     if (code == receiver) {
   	  switch (action) {
-        EOSIO_DISPATCH_HELPER(scrugex, 
-            (newcampaign)(vote)(extend)(refresh)(refundsend) (destroy))
+        EOSIO_DISPATCH_HELPER(scrugex,
+            (newcampaign)(vote)(extend)(refresh)(send)(pay) (destroy))
   	  }
     }
   	else if (code == "eosio.token"_n.value && action == "transfer"_n.value) {
