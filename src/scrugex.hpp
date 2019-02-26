@@ -38,13 +38,14 @@ public:
 
 	ACTION destroy();
 
-	ACTION send(name eosAccount);
+	ACTION send(name eosAccount, uint64_t campaignId);
 
 	ACTION pay(uint64_t campaignId);
 
 private:
 
-	enum Status: uint8_t { funding = 0, milestone = 1, activeVote = 2, waiting = 3, closed = 4 };
+	enum Status: uint8_t { funding = 0, milestone = 1, activeVote = 2, waiting = 3,
+	                       closed = 4, refunding = 5, distributing = 6 };
 
 	void _transfer(name account, asset quantity, string memo, name contract) {
 		action(
@@ -56,6 +57,23 @@ private:
 
 	void _transfer(name account, asset quantity, string memo) {
 		_transfer(account, quantity, memo, "eosio.token"_n);
+	}
+	
+	void _pay(uint64_t campaignId) {
+	  action(
+			permission_level{ _self, "active"_n },
+			_self, "pay"_n,
+			make_tuple(campaignId)
+		).send();
+	}
+	
+	void _verify(name eosAccount, uint64_t userId) {
+	 // accounts_i accounts("scrugeverify"_n, 0);
+	 // auto accountItem = accounts.find(userId);
+
+	 // eosio_assert(accountItem != accounts.end(), "this scruge account is not verified");
+	 // eosio_assert(accountItem->eosAccount == eosAccount,
+		//     "this eos account is not associated with scruge account");
 	}
 
 	void _stopvote(uint64_t campaignId) {
@@ -193,6 +211,7 @@ private:
 		name founderEosAccount;
 		uint64_t startTimestamp;
 		uint64_t endTimestamp;
+		uint64_t timestamp;
 
 		asset softCap;
 		asset hardCap;
@@ -232,6 +251,7 @@ private:
  
 		uint64_t primary_key() const { return eosAccount.value; }
 		uint64_t by_userId() const { return userId; }
+		uint64_t by_not_attempted_payment() const { return attemptedPayment ? 1 : 0; }
 	};
 
 	TABLE voting {
@@ -265,7 +285,10 @@ private:
 
 	typedef multi_index<"contribution"_n, contribution,
 			indexed_by<"byuserid"_n, const_mem_fun<contribution, uint64_t,
-												   &contribution::by_userId>>> contributions_i;
+												   &contribution::by_userId>>,
+			indexed_by<"byap"_n, const_mem_fun<contribution, uint64_t,
+												   &contribution::by_not_attempted_payment>> 
+												   > contributions_i;
 	
 	// to access kyc/aml table
 	

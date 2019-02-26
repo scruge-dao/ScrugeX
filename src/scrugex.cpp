@@ -19,15 +19,8 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	auto userId = stoull(memo_array[0]);
 	auto campaignId = stoull(memo_array[1]);
 
-	// check if account is verified to make this contribution
-	accounts_i accounts("scrugeverify"_n, 0);
-	auto accountItem = accounts.find(userId);
 	auto eosAccount = from;
-	
-	eosio_assert(accountItem != accounts.end(), 
-		"this scruge account is not verified");
-	eosio_assert(accountItem->eosAccount == eosAccount, 
-		"this eos account is not associated with scruge account");
+  _verify(eosAccount, userId);
 
 	// fetch campaign
 	campaigns_i campaigns(_self, 0);
@@ -39,13 +32,11 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 						userId != campaignItem->founderUserId;
 	eosio_assert(isNotFounder, "campaign founder can not contribute");
 
-	// check if campaign started and not finished
 	uint64_t time = time_ms();
-	auto isActive = time > campaignItem->startTimestamp && 
-					time < campaignItem->endTimestamp &&
-					campaignItem->status == Status::funding;
-
-	eosio_assert(isActive, "campaign is not active at the moment");
+	eosio::print(time);
+	eosio_assert(time > campaignItem->startTimestamp, "campaign has not started yet");
+	eosio_assert(time < campaignItem->endTimestamp, "campaign has ended");
+	eosio_assert(campaignItem->status == Status::funding, "campaign is not running");
 
 	// check if allowed to back this amount
 	asset previous = _getContributionQuantity(scope, userId);
@@ -155,6 +146,7 @@ void scrugex::newcampaign(
 		r.status = Status::funding;
 		r.annualInflationPercentStart = annualInflationPercentStart;
 		r.annualInflationPercentEnd = annualInflationPercentEnd;
+		r.timestamp = time_ms();
 	});
 
 	// to-do sort milestone arguments by deadline
@@ -191,13 +183,7 @@ void scrugex::newcampaign(
 void scrugex::vote(name eosAccount, uint64_t userId, uint64_t campaignId, bool vote) {
 	require_auth(eosAccount);
 
-	// check if account is verified to make this vote
-	accounts_i accounts("scrugeverify"_n, 0);
-	auto accountItem = accounts.find(userId);
-
-	eosio_assert(accountItem != accounts.end(), "this scruge account is not verified");
-	eosio_assert(accountItem->eosAccount == eosAccount,
-		"this eos account is not associated with scruge account");
+	_verify(eosAccount, userId);
 
 	campaigns_i campaigns(_self, 0);
 	auto campaignItem = campaigns.find(campaignId);
@@ -268,14 +254,15 @@ void scrugex::refresh() {
 
 		if (campaignItem.raised < campaignItem.softCap) {
 
-			// close campaign
+			// refund all money
+			
 			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-				r.status = Status::closed;
+				r.status = Status::refunding;
 			});
 
-			// to-do return money
-
-			continue;
+      _pay(campaignItem.campaignId);
+      
+			break;
 		}
 
 		if (campaignItem.status == Status::funding) {
@@ -293,7 +280,7 @@ void scrugex::refresh() {
 			quantity.amount = percent;
 			_transfer(campaignItem.founderEosAccount, quantity, "scruge: initial funds");
 
-			continue; // to-do probably should be here for optimization, but does some harm in debug?
+			break;
 		}
 
 		auto scope = campaignItem.scope;
@@ -399,62 +386,100 @@ void scrugex::refresh() {
 		}
 	}
 
-	transaction t{};
-  t.actions.emplace_back(permission_level(_self, "active"_n),
-            					   _self, "refresh"_n,
-            					   make_tuple());
-  t.delay_sec = 300;
-  t.send(time_ms(), _self, true);
+// 	transaction t{};
+//   t.actions.emplace_back(permission_level(_self, "active"_n),
+//             					   _self, "refresh"_n,
+//             					   make_tuple());
+//   t.delay_sec = 300;
+  // t.send(time_ms(), _self, true);
   
 } // void scrugex::refresh
 
 
-void scrugex::send(name eosAccount) {
+void scrugex::send(name eosAccount, uint64_t campaignId) {
   require_auth(_self);
   
-  // find in contributions
-  
-  // remove from contributions
-  
-  // inline send money to user
-  _transfer(eosAccount, asset(1, EOS_SYMBOL), "scrugex refund for campaign -name-");
-  
-} // void scrugex::send
-
-
-void scrugex::pay(uint64_t campaignId) {
-  require_auth(_self);
-  
-  // assert isRefunding == true
+  // fetch campaign
+	campaigns_i campaigns(_self, 0);
+	auto campaignItem = campaigns.find(campaignId);
+	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
+	auto scope = campaignItem->scope;
+	
+	eosio_assert(campaignItem->status == Status::refunding || campaignItem->status == Status::distributing, 
+	    "this campaign is not paying anyone right now");
   
   // get first in contributions
+  contributions_i contributions(_self, scope);
+	auto contributionItem = contributions.find(eosAccount.value);
+	
+	eosio_assert(contributionItem->isPaid == false, "this user has already been paid");
+
+  if (campaignItem->status == Status::refunding) {
+    uint64_t percent = 1000000;
+    uint64_t amount = get_percent(contributionItem->quantity.amount, percent);
+    _transfer(eosAccount, asset(amount, EOS_SYMBOL), "ScrugeX: Refund for campaign");
+  }  
   
-  // if doesn't exist, set isRefunding to false
-  
-  // else 
-  
-  // modify transfer_tries ++
-  
-  // schedule deferred actions
-  
-  {
-    transaction t{};
-    t.actions.emplace_back(permission_level(_self, "active"_n),
-              					   _self, "send"_n,
-              					   make_tuple(  ));
-    t.delay_sec = 1;
-    t.send(time_ms(), _self, true);
-  }
+  // remove from contributions
+  contributions.modify(contributionItem, same_payer, [&](auto& r) {
+     r.attemptedPayment = true;
+     r.isPaid = true;
+  });
   
   {
     transaction t{};
     t.actions.emplace_back(permission_level(_self, "active"_n),
               					   _self, "pay"_n,
               					   make_tuple( campaignId ));
-    t.delay_sec = 2;
+    t.delay_sec = 1;
     t.send(time_ms(), _self, true);
   }
 
+} // void scrugex::send
+
+
+void scrugex::pay(uint64_t campaignId) {
+  require_auth(_self);
+  
+  // fetch campaign
+	campaigns_i campaigns(_self, 0);
+	auto campaignItem = campaigns.find(campaignId);
+	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
+	auto scope = campaignItem->scope;
+	
+	eosio_assert(campaignItem->status == Status::refunding || campaignItem->status == Status::distributing, 
+	    "this campaign is not paying anyone right now");
+  
+  // get first in contributions
+  contributions_i contributions(_self, scope);
+  auto notAttemptedContributions = contributions.get_index<"byap"_n>();
+	auto item = notAttemptedContributions.find(0);
+	
+  // if doesn't exist, close campaign and quit
+  if (item == notAttemptedContributions.end()) {
+      campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+				r.status = Status::closed;
+			});
+			return;
+  }
+  
+	// set attempted payment
+	auto eosAccount = item->eosAccount;
+	auto contributionItem = contributions.find(eosAccount.value);
+  contributions.modify(contributionItem, same_payer, [&](auto& r) {
+    r.attemptedPayment = true;
+  });
+  
+  // schedule 
+  {
+    transaction t{};
+    t.actions.emplace_back(permission_level(_self, "active"_n),
+              					   _self, "send"_n,
+              					   make_tuple( eosAccount, campaignId ));
+    t.delay_sec = 1;
+    t.send(time_ms(), _self, true);
+  }
+  
 } // void scrugex::startrefund
 
 
