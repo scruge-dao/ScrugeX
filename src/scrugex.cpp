@@ -19,7 +19,7 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	auto userId = stoull(memo_array[0]);
 	auto campaignId = stoull(memo_array[1]);
 
-	auto eosAccount = from;
+  auto eosAccount = from;
   _verify(eosAccount, userId);
 
 	// fetch campaign
@@ -33,7 +33,7 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	eosio_assert(isNotFounder, "campaign founder can not contribute");
 
 	uint64_t time = time_ms();
-	eosio::print(time);
+	
 	eosio_assert(time > campaignItem->startTimestamp, "campaign has not started yet");
 	eosio_assert(time < campaignItem->endTimestamp, "campaign has ended");
 	eosio_assert(campaignItem->status == Status::funding, "campaign is not running");
@@ -149,8 +149,6 @@ void scrugex::newcampaign(
 		r.timestamp = time_ms();
 	});
 
-	// to-do sort milestone arguments by deadline
-
 	milestones_i table(_self, scope);
 	auto lastDeadline = endTimestamp;
 	auto totalFundsRelease = initialFundsReleasePercent;
@@ -242,49 +240,69 @@ void scrugex::refresh() {
 
 	auto now = time_ms();
 	campaigns_i campaigns(_self, 0);
+	
+	uint64_t nextRefreshTime = 300;
 
 	for (auto& campaignItem: campaigns) {
 
 		if (now < campaignItem.endTimestamp || 			// still gathering money
 			campaignItem.status == Status::closed ||	// over
 			campaignItem.status == Status::waiting) {	// or waiting for input to-do how long do we wait
-
+			
 			continue;
 		}
 
-		if (campaignItem.raised < campaignItem.softCap) {
+    // check if still funding but did not reach soft cap
+		if (campaignItem.status == Status::funding && campaignItem.raised < campaignItem.softCap) {
 
-			// refund all money
-			
+			// did not reach soft cap, refund all money
 			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
 				r.status = Status::refunding;
 			});
 
       _pay(campaignItem.campaignId);
       
+      // don't schedule refresh if a campaign is refunding
+      nextRefreshTime = 0;
 			break;
 		}
+		
+		// check if supposed to be refunding
+		if (campaignItem.status == Status::refunding || campaignItem.status == Status::distributing) {
+		  
+		  // schedule deferred transaction to refund or ditribute
+		  // this should fail if another one is scheduled
+		  _pay(campaignItem.campaignId);
+		  
+		  // don't schedule refresh if a campaign is refunding
+		  nextRefreshTime = 0;
+		  break;
+		}
 
+    // initialize milestones mode if funding complete
 		if (campaignItem.status == Status::funding) {
 
-			// starting milestones now
-			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-				r.status = Status::milestone;
-			});
-
 			// release initial funds
-			auto percent = get_percent(campaignItem.raised.amount, 
+			auto percent = get_percent(campaignItem.raised.amount,
 									   campaignItem.initialFundsReleasePercent);
 
 			auto quantity = campaignItem.raised;
 			quantity.amount = percent;
 			_transfer(campaignItem.founderEosAccount, quantity, "scruge: initial funds");
 
+			// if this status, means initial funds have been released
+			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+				r.status = Status::milestone;
+			});
+
+      // complete this transaction and run next one in a second
+      nextRefreshTime = 1;
 			break;
 		}
+		
+		// check for ongoing voting
 
 		auto scope = campaignItem.scope;
-
 		milestones_i milestones(_self, scope);
 		auto milestoneId = campaignItem.currentMilestone;
 		auto currentMilestoneItem = milestones.find(milestoneId);
@@ -320,6 +338,9 @@ void scrugex::refresh() {
 						});
 					}
 				}
+				
+				// complete this transaction and run next one in a second
+				nextRefreshTime = 1;
 				break;
 			}
 		}
@@ -376,6 +397,9 @@ void scrugex::refresh() {
 							});
 						}
 					}
+					
+					// complete this transaction and run next one in a second
+					nextRefreshTime = 1;
 					break;
 				}
 			}
@@ -386,12 +410,10 @@ void scrugex::refresh() {
 		}
 	}
 
-// 	transaction t{};
-//   t.actions.emplace_back(permission_level(_self, "active"_n),
-//             					   _self, "refresh"_n,
-//             					   make_tuple());
-//   t.delay_sec = 300;
-  // t.send(time_ms(), _self, true);
+  if (nextRefreshTime != 0) {
+    _cancel_refresh();
+  	_schedule_refresh(nextRefreshTime);
+  }
   
 } // void scrugex::refresh
 
@@ -425,15 +447,6 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
      r.attemptedPayment = true;
      r.isPaid = true;
   });
-  
-  {
-    transaction t{};
-    t.actions.emplace_back(permission_level(_self, "active"_n),
-              					   _self, "pay"_n,
-              					   make_tuple( campaignId ));
-    t.delay_sec = 1;
-    t.send(time_ms(), _self, true);
-  }
 
 } // void scrugex::send
 
@@ -455,11 +468,12 @@ void scrugex::pay(uint64_t campaignId) {
   auto notAttemptedContributions = contributions.get_index<"byap"_n>();
 	auto item = notAttemptedContributions.find(0);
 	
-  // if doesn't exist, close campaign and quit
+  // if doesn't exist, close campaign, go back to refresh cycle
   if (item == notAttemptedContributions.end()) {
       campaigns.modify(campaignItem, same_payer, [&](auto& r) {
 				r.status = Status::closed;
 			});
+			_schedule_refresh(1);
 			return;
   }
   
@@ -471,19 +485,29 @@ void scrugex::pay(uint64_t campaignId) {
   });
   
   // schedule 
+  auto now = time_ms();
   {
     transaction t{};
     t.actions.emplace_back(permission_level(_self, "active"_n),
               					   _self, "send"_n,
               					   make_tuple( eosAccount, campaignId ));
     t.delay_sec = 1;
-    t.send(time_ms(), _self, true);
+    t.send(now, _self, false);
+  }
+
+  {
+    transaction t{};
+    t.actions.emplace_back(permission_level(_self, "active"_n),
+              					   _self, "pay"_n,
+              					   make_tuple( campaignId ));
+    t.delay_sec = 1;
+    t.send(now + 1, _self, false);
   }
   
 } // void scrugex::startrefund
 
 
-// debug 
+// debug
 
 
 void scrugex::destroy() {

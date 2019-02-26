@@ -76,6 +76,19 @@ private:
 		//     "this eos account is not associated with scruge account");
 	}
 
+  void _cancel_refresh() {
+    cancel_deferred("refresh"_n.value);
+  }
+
+  void _schedule_refresh(uint64_t nextRefreshTime) {
+    transaction t{};
+    t.actions.emplace_back(permission_level(_self, "active"_n),
+              					   _self, "refresh"_n,
+              					   make_tuple());
+    t.delay_sec = nextRefreshTime;
+    t.send("refresh"_n.value, _self, false);
+  }
+
 	void _stopvote(uint64_t campaignId) {
 		campaigns_i campaigns(_self, 0);
 		auto campaignItem = campaigns.find(campaignId);
