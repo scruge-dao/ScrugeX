@@ -408,7 +408,7 @@ void scrugex::refresh() {
 	}
 
   if (nextRefreshTime != 0) {
-  // 	_scheduleRefresh(nextRefreshTime);
+  	_scheduleRefresh(nextRefreshTime);
   }
   
 } // void scrugex::refresh
