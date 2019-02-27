@@ -22,11 +22,11 @@ public:
 	void transfer(name from, name to, asset quantity, string memo);
 
 	ACTION newcampaign(name founderEosAccount, asset softCap, asset hardCap, 
-		uint64_t initialFundsReleasePercent,
+		uint64_t initialFundsReleasePercent, bool kycEnabled,
 		uint64_t maxUserContributionPercent, uint64_t minUserContributionPercent,
 		uint64_t startTimestamp, uint64_t endTimestamp, vector<milestoneInfo> milestones);
 
-	ACTION vote(name eosAccount, uint64_t userId, uint64_t campaignId, bool vote);
+	ACTION vote(name eosAccount, uint64_t campaignId, bool vote);
 
 	ACTION extend(uint64_t campaignId);
 
@@ -51,11 +51,11 @@ private:
 			contract, "transfer"_n,
 			make_tuple(_self, account, quantity, memo)
 		).send();
-	}
+	} // void _transfer
 
 	void _transfer(name account, asset quantity, string memo) {
 		_transfer(account, quantity, memo, "eosio.token"_n);
-	}
+	} // void _transfer
 	
 	void _pay(uint64_t campaignId) {
 	  action(
@@ -63,16 +63,23 @@ private:
 			_self, "pay"_n,
 			make_tuple(campaignId)
 		).send();
-	}
-	
-	void _verify(name eosAccount) {
-	 // accounts_i accounts("scrugeverify"_n, _self.value);
-	 // auto accountItem = accounts.find(eosAccount);
+	} // void _pay
 
-	 // eosio_assert(accountItem != accounts.end(), "this scruge account is not verified");
-	 // eosio_assert(accountItem->eosAccount == eosAccount,
-		//     "this eos account is not associated with scruge account");
-	}
+	uint64_t _verify(name eosAccount, bool kycEnabled) {
+	  if (kycEnabled) {
+  	 // accounts_i accounts("scrugeverify"_n, _self.value);
+  	 // auto accountItem = accounts.find(eosAccount);
+  
+  	 // eosio_assert(accountItem != accounts.end(), "this scruge account is not verified");
+  	 // eosio_assert(accountItem->eosAccount == eosAccount,
+  		//     "this eos account is not associated with scruge account");
+  		
+  		// return accountItem->id;
+	  }
+
+		return eosAccount.value;
+		
+	} // void _verify
 
   void _scheduleRefresh(uint64_t nextRefreshTime) {
     cancel_deferred("refresh"_n.value);
@@ -83,7 +90,7 @@ private:
               					   make_tuple());
     t.delay_sec = nextRefreshTime;
     t.send("refresh"_n.value, _self, false);
-  }
+  } // void _scheduleRefresh
   
   void _scheduleNextPayout(name eosAccount, uint64_t campaignId) {
     auto now = time_ms();
@@ -104,7 +111,7 @@ private:
       t.delay_sec = 2;
       t.send(now + 1, _self, false);
     }
-  }
+  } // void _scheduleNextPayout
 
 	void _stopvote(uint64_t campaignId) {
 		campaigns_i campaigns(_self, _self.value);
@@ -129,7 +136,7 @@ private:
 		voting.modify(votingItem, _self, [&](auto& r) {
 			r.active = false;
 		});
-	}
+	} // void _stopvote
 
 	void _startvote(uint64_t campaignId, uint8_t kind) {
 		campaigns_i campaigns(_self, _self.value);
@@ -183,8 +190,8 @@ private:
 
 	void _updateCampaignsCount(uint64_t scope) {
 		information_i information(_self, _self.value);
+		
 		auto lambda = [&](auto& row) {
-			row.key = 0;
 			row.campaignsCount = scope + 1;
 		};
 
@@ -219,10 +226,9 @@ private:
   // structs
 
 	TABLE information {
-		uint64_t key;
 		uint64_t campaignsCount;
 
-		uint64_t primary_key() const { return key; }
+		uint64_t primary_key() const { return 0; }
 	};
 
 	TABLE campaigns {
@@ -231,7 +237,6 @@ private:
 		name founderEosAccount;
 		uint64_t startTimestamp;
 		uint64_t endTimestamp;
-		uint64_t timestamp;
 
 		asset softCap;
 		asset hardCap;
@@ -242,6 +247,7 @@ private:
 		asset raised;
 		uint64_t backersCount;
 		uint8_t currentMilestone;
+		bool kycEnabled;
 
 		uint64_t primary_key() const { return campaignId; }
 	};
@@ -281,7 +287,7 @@ private:
 		uint64_t primary_key() const { return voteId; }
 	};
 
-	struct [[eosio::table]] voters {
+	TABLE voters {
 		uint64_t userId;
 		uint8_t voteId;
 		bool vote;

@@ -8,18 +8,8 @@ using namespace std;
 
 // METHODS
 
-// todo can this be optimized?
-vector<string> split(string str, string sep) {
-  char* cstr = const_cast<char*>(str.c_str()); 
-  char* current;
-  vector<string> arr;
-  current=strtok(cstr,sep.c_str());
-  
-  while(current!=NULL) {
-    arr.push_back(current); 
-    current=strtok(NULL,sep.c_str()); 
-  }
-  return arr;
+bool is_number(const string& s) {
+    return !s.empty() && s.find_first_not_of("0123456789") == string::npos;
 }
 
 uint64_t time_ms() {
@@ -28,4 +18,9 @@ uint64_t time_ms() {
 
 uint64_t get_percent(uint64_t value, uint64_t percent) { 
   return value * percent / 100;
+}
+
+asset get_percent(asset quantity, uint64_t percent) {
+  auto amount = get_percent(quantity.amount, percent);
+  return asset(amount, quantity.symbol);
 }

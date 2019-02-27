@@ -10,17 +10,14 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	// check transfer
 	eosio_assert(quantity.symbol.is_valid(), "invalid quantity");
 	eosio_assert(quantity.amount > 0, "only positive quantity allowed");
-	eosio_assert(quantity.symbol == EOS_SYMBOL, "only SCR tokens allowed");
+	eosio_assert(quantity.symbol == EOS_SYMBOL, "only EOS tokens allowed");
+	
 	eosio_assert(memo != "", "incorrectly formatted memo");
+  eosio_assert(is_number(memo), "campaignId is a number");
 
-	// get scruge account and campaign id
-	auto memo_array = split(memo, "-");
-	eosio_assert(memo_array.size() == 2, "incorrectly formatted memo");
-	auto userId = stoull(memo_array[0]);
-	auto campaignId = stoull(memo_array[1]);
-
+	uint64_t time = time_ms();
+	auto campaignId = stoull(memo);
   auto eosAccount = from;
-  _verify(eosAccount);
 
 	// fetch campaign
 	campaigns_i campaigns(_self, _self.value);
@@ -30,8 +27,9 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	auto scope = campaignItem->campaignId;
 	auto isNotFounder = eosAccount != campaignItem->founderEosAccount;
 	eosio_assert(isNotFounder, "campaign founder can not contribute");
-
-	uint64_t time = time_ms();
+	
+  // get userId from kyc or eosAccount
+  uint64_t userId = _verify(eosAccount, campaignItem->kycEnabled);
 	
 	eosio_assert(time > campaignItem->startTimestamp, "campaign has not started yet");
 	eosio_assert(time < campaignItem->endTimestamp, "campaign has ended");
@@ -41,8 +39,10 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	asset previous = _getContributionQuantity(scope, userId);
 	asset total = previous + quantity;
 	
-// 	eosio_assert(campaignItem->maxUserContribution >= total, "you can not contribute this much");
-// 	eosio_assert(campaignItem->minUserContribution <= total, "you can not contribute this little");
+	asset max = get_percent(campaignItem->softCap, campaignItem->maxUserContributionPercent);
+	asset min = get_percent(campaignItem->softCap, campaignItem->minUserContributionPercent);
+	eosio_assert(max > total, "you can not contribute this much");
+	eosio_assert(min < total, "you can not contribute this little");
 
 	// to-do check campaign cap?
 
@@ -86,7 +86,7 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 
 
 void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap, 
-		uint64_t initialFundsReleasePercent,
+		uint64_t initialFundsReleasePercent, bool kycEnabled,
 		uint64_t maxUserContributionPercent, uint64_t minUserContributionPercent,
 		uint64_t startTimestamp, uint64_t endTimestamp, vector<milestoneInfo> milestones) {
 
@@ -116,7 +116,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 		r.raised = asset(0, EOS_SYMBOL);
 		r.currentMilestone = 0;
 		r.status = Status::funding;
-		r.timestamp = time_ms();
+		r.kycEnabled = kycEnabled;
 	});
 
 	int scope = _getCampaignsCount();
@@ -151,10 +151,8 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 } // void scrugex::newcampaign
 
 
-void scrugex::vote(name eosAccount, uint64_t userId, uint64_t campaignId, bool vote) {
+void scrugex::vote(name eosAccount, uint64_t campaignId, bool vote) {
 	require_auth(eosAccount);
-
-	_verify(eosAccount);
 
 	campaigns_i campaigns(_self, _self.value);
 	auto campaignItem = campaigns.find(campaignId);
@@ -164,6 +162,9 @@ void scrugex::vote(name eosAccount, uint64_t userId, uint64_t campaignId, bool v
 	  "campaign founder can not participate in the voting");
 
 	eosio_assert(campaignItem->status == Status::activeVote, "voting is not currently held");
+
+  // get userId from kyc or eosAccount
+	uint64_t userId = _verify(eosAccount, campaignItem->kycEnabled);
 
 	auto scope = campaignItem->campaignId;
 	auto quantity = _getContributionQuantity(scope, userId);
@@ -178,7 +179,7 @@ void scrugex::vote(name eosAccount, uint64_t userId, uint64_t campaignId, bool v
 		votingItem++;
 	}
 
-	// to-do check if should maybe start the voting
+	// to-do maybe call refresh on this campaign to start a voting?
 
 	eosio_assert(votingItem != voting.end(), "voting is not currently held");
 
@@ -407,10 +408,11 @@ void scrugex::refresh() {
 	}
 
   if (nextRefreshTime != 0) {
-  	_scheduleRefresh(nextRefreshTime);
+  // 	_scheduleRefresh(nextRefreshTime);
   }
   
 } // void scrugex::refresh
+
 
 void scrugex::send(name eosAccount, uint64_t campaignId) {
   require_auth(_self);
@@ -421,8 +423,10 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 	auto scope = campaignItem->campaignId;
 	
+	// this action only works when campaign is automatically refunding
+	// to request failed refund after campaign was closed, there will be another action
 	eosio_assert(campaignItem->status == Status::refunding || campaignItem->status == Status::distributing, 
-	    "this campaign is not paying anyone right now");
+	  "this campaign is not paying anyone right now");
   
   // get first in contributions
   contributions_i contributions(_self, scope);
@@ -431,7 +435,7 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 	eosio_assert(contributionItem->isPaid == false, "this user has already been paid");
 
   if (campaignItem->status == Status::refunding) {
-    uint64_t percent = 1000000;
+    uint64_t percent = 100;
     uint64_t amount = get_percent(contributionItem->quantity.amount, percent);
     _transfer(eosAccount, asset(amount, EOS_SYMBOL), "ScrugeX: Refund for campaign");
   }  
