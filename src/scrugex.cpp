@@ -117,6 +117,8 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 		r.currentMilestone = 0;
 		r.status = Status::funding;
 		r.kycEnabled = kycEnabled;
+		r.releasedPercent = 0;
+		r.waitingEndTimestamp = 0;
 	});
 
 	int scope = _getCampaignsCount();
@@ -211,7 +213,7 @@ void scrugex::extend(uint64_t campaignId) {
 	
 } // void scrugex::extend
 
-
+// to-do refactor
 void scrugex::refresh() {
 	require_auth(_self);
 
@@ -224,22 +226,28 @@ void scrugex::refresh() {
 	for (auto& campaignItem: campaigns) {
 
 		if (now < campaignItem.endTimestamp || 			// still gathering money
-			campaignItem.status == Status::closed ||	// over
-			campaignItem.status == Status::waiting) {	// or waiting for input to-do how long do we wait
+			campaignItem.status == Status::closed) {	// over
 			
 			continue;
+		}
+		
+		// check if waiting time has passed 
+		if (campaignItem.status == Status::waiting && campaignItem.waitingEndTimestamp < now) {
+		  
+	    // founder failed to act, refunding
+		  _refund(campaignItem.campaignId);
+		  
+      // don't schedule refresh if a campaign is refunding
+      nextRefreshTime = 0;
+			break;
 		}
 
     // check if still funding but did not reach soft cap
 		if (campaignItem.status == Status::funding && campaignItem.raised < campaignItem.softCap) {
 
 			// did not reach soft cap, refund all money
-			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-				r.status = Status::refunding;
-			});
-
-      _pay(campaignItem.campaignId);
-      
+		  _refund(campaignItem.campaignId);
+		  
       // don't schedule refresh if a campaign is refunding
       nextRefreshTime = 0;
 			break;
@@ -266,10 +274,10 @@ void scrugex::refresh() {
 
 			auto quantity = campaignItem.raised;
 			quantity.amount = percent;
-			_transfer(campaignItem.founderEosAccount, quantity, "scruge: initial funds");
+			_transfer(campaignItem.founderEosAccount, quantity, "ScrugeX: Initial Funds");
 
-			// if this status, means initial funds have been released
 			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+			  r.releasedPercent += campaignItem.initialFundsReleasePercent;
 				r.status = Status::milestone;
 			});
 
@@ -366,6 +374,10 @@ void scrugex::refresh() {
 							auto quantity = campaignItem.raised;
 							quantity.amount = percent;
 							_transfer(campaignItem.founderEosAccount, quantity, "ScrugeX: Milestone Payment");
+							
+							campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+        			  r.releasedPercent += currentMilestoneItem->fundsReleasePercent;
+        			});
 
               // get next milestone
 							uint64_t nextMilestoneId = campaignItem.currentMilestone + 1;
@@ -394,9 +406,10 @@ void scrugex::refresh() {
 							// wait for some time for founder to return funds or start extend voting
 							campaigns.modify(campaignItem, same_payer, [&](auto& r) {
 								r.status = Status::waiting;
+								r.waitingEndTimestamp = now + DAY * 7; // to-do USE ACTUAL VALUE
 							});
 							
-							// to-do actual waiting 
+							// to-do actual waiting
 						}
 						
 						// complete this transaction and run next one in a second
@@ -441,8 +454,10 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 	eosio_assert(contributionItem->isPaid == false, "this user has already been paid");
 
   if (campaignItem->status == Status::refunding) {
-    uint64_t percent = 100;
-    uint64_t amount = get_percent(contributionItem->quantity.amount, percent);
+    
+    uint64_t refundPercent = 100 - campaignItem->releasedPercent;
+    
+    uint64_t amount = get_percent(contributionItem->quantity.amount, refundPercent);
     _transfer(eosAccount, asset(amount, EOS_SYMBOL), "ScrugeX: Refund for campaign");
   }  
   

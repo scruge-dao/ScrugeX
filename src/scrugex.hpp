@@ -164,8 +164,8 @@ private:
 		// to-do set correct time
 		// check other votes
 		auto now = time_ms();
-		auto start = now;//  + DAY * 14; // 14 days notification 
-		auto end = start + DAY * 14; // 3 days vote time
+		auto start = now;             // 14 days notification 
+		auto end = start + DAY * 14;  // 7 days vote time
 
 		// delete voters from previous voting
 		voters_i voters(_self, scope);
@@ -187,6 +187,18 @@ private:
 			r.status = Status::activeVote;
 		});
 	} // void _startvote
+
+  void _refund(uint64_t campaignId) {
+    campaigns_i campaigns(_self, _self.value);
+    auto campaignItem = campaigns.find(campaignId);
+    
+		campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+			r.status = Status::refunding;
+		});
+
+    _pay(campaignItem->campaignId);
+    
+  } // void _refund
 
 	void _updateCampaignsCount(uint64_t scope) {
 		information_i information(_self, _self.value);
@@ -237,6 +249,7 @@ private:
 		name founderEosAccount;
 		uint64_t startTimestamp;
 		uint64_t endTimestamp;
+		uint64_t waitingEndTimestamp;
 
 		asset softCap;
 		asset hardCap;
@@ -245,6 +258,7 @@ private:
 		uint64_t minUserContributionPercent;
 
 		asset raised;
+		uint64_t releasedPercent;
 		uint64_t backersCount;
 		uint8_t currentMilestone;
 		bool kycEnabled;
