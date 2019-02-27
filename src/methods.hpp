@@ -27,5 +27,5 @@ uint64_t time_ms() {
 }
 
 uint64_t get_percent(uint64_t value, uint64_t percent) { 
-  return (value * percent / 100) / 10000;
+  return value * percent / 100;
 }

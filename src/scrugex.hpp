@@ -21,13 +21,10 @@ public:
 
 	void transfer(name from, name to, asset quantity, string memo);
 
-	ACTION newcampaign(uint64_t founderUserId, name founderEosAccount,
-		asset softCap, asset hardCap, uint64_t initialFundsReleasePercent,
-		asset maxUserContribution, asset minUserContribution,
-		uint64_t publicTokenPercent, uint64_t tokenSupply,
-		uint64_t startTimestamp, uint64_t endTimestamp,
-		uint64_t annualInflationPercentStart, uint64_t annualInflationPercentEnd,
-		vector<milestoneInfo> milestones);
+	ACTION newcampaign(name founderEosAccount, asset softCap, asset hardCap, 
+		uint64_t initialFundsReleasePercent,
+		uint64_t maxUserContributionPercent, uint64_t minUserContributionPercent,
+		uint64_t startTimestamp, uint64_t endTimestamp, vector<milestoneInfo> milestones);
 
 	ACTION vote(name eosAccount, uint64_t userId, uint64_t campaignId, bool vote);
 
@@ -68,9 +65,9 @@ private:
 		).send();
 	}
 	
-	void _verify(name eosAccount, uint64_t userId) {
+	void _verify(name eosAccount) {
 	 // accounts_i accounts("scrugeverify"_n, _self.value);
-	 // auto accountItem = accounts.find(userId);
+	 // auto accountItem = accounts.find(eosAccount);
 
 	 // eosio_assert(accountItem != accounts.end(), "this scruge account is not verified");
 	 // eosio_assert(accountItem->eosAccount == eosAccount,
@@ -229,9 +226,8 @@ private:
 	};
 
 	TABLE campaigns {
-		uint8_t status;
+		uint8_t status;   // Status
 		uint64_t campaignId;
-		uint64_t founderUserId;
 		name founderEosAccount;
 		uint64_t startTimestamp;
 		uint64_t endTimestamp;
@@ -240,17 +236,12 @@ private:
 		asset softCap;
 		asset hardCap;
 		uint64_t initialFundsReleasePercent;
-		asset maxUserContribution;
-		asset minUserContribution;
-		uint64_t publicTokenPercent;
-		uint64_t tokenSupply;
+		uint64_t maxUserContributionPercent;
+		uint64_t minUserContributionPercent;
 
 		asset raised;
 		uint64_t backersCount;
 		uint8_t currentMilestone;
-
-		uint64_t annualInflationPercentStart;
-		uint64_t annualInflationPercentEnd;
 
 		uint64_t primary_key() const { return campaignId; }
 	};
@@ -279,7 +270,7 @@ private:
 
 	TABLE voting {
 		uint64_t voteId;
-		uint8_t kind;			// 0 - extend, 1 - deadline
+		uint8_t kind;   // VoteKind
 		uint8_t milestoneId;
 		int64_t voters;
 		int64_t positiveVotes;
@@ -316,14 +307,14 @@ private:
 	// to access kyc/aml table
 	
 	struct account {
-		uint64_t userId;
+		uint64_t id;
 		name eosAccount;
 
-		uint64_t primary_key() const { return userId; }
-		uint64_t by_eos() const { return eosAccount.value; }
+		uint64_t primary_key() const { return eosAccount.value; }
+		uint64_t identifier() const { return id; }
 	};
 
 	typedef multi_index<"accounts"_n, account,
-		indexed_by<"byeos"_n, const_mem_fun<account, uint64_t,
-											&account::by_eos>>> accounts_i;
+		indexed_by<"identifier"_n, const_mem_fun<account, uint64_t,
+											&account::identifier>>> accounts_i;
 };
