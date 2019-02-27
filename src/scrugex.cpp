@@ -39,8 +39,8 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	asset previous = _getContributionQuantity(scope, userId);
 	asset total = previous + quantity;
 	
-	asset max = get_percent(campaignItem->softCap, campaignItem->maxUserContributionPercent);
-	asset min = get_percent(campaignItem->softCap, campaignItem->minUserContributionPercent);
+	asset max = get_percent(campaignItem->hardCap, campaignItem->maxUserContributionPercent);
+	asset min = get_percent(campaignItem->hardCap, campaignItem->minUserContributionPercent);
 	eosio_assert(max > total, "you can not contribute this much");
 	eosio_assert(min < total, "you can not contribute this little");
 
@@ -286,23 +286,25 @@ void scrugex::refresh() {
 		auto currentMilestoneItem = milestones.find(milestoneId);
 		voting_i voting(_self, scope);
 
-		// check extend deadline votings
 		for (auto& votingItem: voting) { 
 		  
 		  // to-do improve search for active voting
 		
+		  // check extend deadline votings
 			if (votingItem.milestoneId == milestoneId &&
 				votingItem.active &&
 				votingItem.kind == VoteKind::extendDeadline) {
 
 				// to-do check if can close vote earlier
 
-        // voting ended 
+        // extend voting should be over  
 				if (votingItem.endTimestamp < now || votingItem.voters == campaignItem.backersCount) {
 				  
+				  // stop it
 					_stopvote(campaignItem.campaignId);
 
-					if (votingItem.positiveVotes >= votingItem.voters * T2) {
+          // calculate decision
+					if (votingItem.positiveVotes >= get_percent(votingItem.voters, T1)) {
 
 						// to-do test and complete
 
@@ -319,6 +321,8 @@ void scrugex::refresh() {
 						campaigns.modify(campaignItem, same_payer, [&](auto& r) {
 							r.status = Status::milestone;
 						});
+						
+						// to-do correct timers?
 					}
 					
 				  // complete this transaction and run next one in a second
@@ -330,12 +334,11 @@ void scrugex::refresh() {
 		}
 
 		if (currentMilestoneItem->deadline < now) {
-		
-			// check if voting for deadline is over
 			
 			// will start voting unless told not to 
 			bool shouldStartNextMilestoneVoting = true;
 			
+			// find ongoing milstone voting
 			for (auto& votingItem: voting) { // to-do improve search for active voting
 				if (votingItem.milestoneId == milestoneId &&
 					votingItem.active &&
@@ -346,11 +349,14 @@ void scrugex::refresh() {
 					
 					// to-do check if can close vote earlier
 					
-					// Voting ended
+					// milestone voting should be over  
 					if (votingItem.endTimestamp < now || votingItem.voters == campaignItem.backersCount) {
+					  
+					  // stop it
 						_stopvote(campaignItem.campaignId);
 						
-						if (votingItem.positiveVotes >= votingItem.voters * T1) {
+						// calculate decision
+						if (votingItem.positiveVotes >= get_percent(votingItem.voters, T1)) {
 						  
 					    // milestone vote success
 					    
@@ -359,7 +365,7 @@ void scrugex::refresh() {
 													   currentMilestoneItem->fundsReleasePercent);
 							auto quantity = campaignItem.raised;
 							quantity.amount = percent;
-							_transfer(campaignItem.founderEosAccount, quantity, "scruge: milestone payment");
+							_transfer(campaignItem.founderEosAccount, quantity, "ScrugeX: Milestone Payment");
 
               // get next milestone
 							uint64_t nextMilestoneId = campaignItem.currentMilestone + 1;

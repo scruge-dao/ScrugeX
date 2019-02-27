@@ -42,7 +42,7 @@ private:
 
 	enum Status: uint8_t { funding = 0, milestone = 1, activeVote = 2, waiting = 3,
 	                       closed = 4, refunding = 5, distributing = 6 };
-	                       
+	
 	enum VoteKind: uint8_t { extendDeadline = 0, milestoneResult = 1 };
 
 	void _transfer(name account, asset quantity, string memo, name contract) {
