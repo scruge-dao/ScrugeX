@@ -21,8 +21,7 @@ public:
 
 	void transfer(name from, name to, asset quantity, string memo);
 
-	ACTION newcampaign(
-		uint64_t campaignId, uint64_t founderUserId, name founderEosAccount,
+	ACTION newcampaign(uint64_t founderUserId, name founderEosAccount,
 		asset softCap, asset hardCap, uint64_t initialFundsReleasePercent,
 		asset maxUserContribution, asset minUserContribution,
 		uint64_t publicTokenPercent, uint64_t tokenSupply,
@@ -46,6 +45,8 @@ private:
 
 	enum Status: uint8_t { funding = 0, milestone = 1, activeVote = 2, waiting = 3,
 	                       closed = 4, refunding = 5, distributing = 6 };
+	                       
+	enum VoteKind: uint8_t { extendDeadline = 0, milestoneResult = 1 };
 
 	void _transfer(name account, asset quantity, string memo, name contract) {
 		action(
@@ -68,7 +69,7 @@ private:
 	}
 	
 	void _verify(name eosAccount, uint64_t userId) {
-	 // accounts_i accounts("scrugeverify"_n, 0);
+	 // accounts_i accounts("scrugeverify"_n, _self.value);
 	 // auto accountItem = accounts.find(userId);
 
 	 // eosio_assert(accountItem != accounts.end(), "this scruge account is not verified");
@@ -76,11 +77,9 @@ private:
 		//     "this eos account is not associated with scruge account");
 	}
 
-  void _cancel_refresh() {
+  void _scheduleRefresh(uint64_t nextRefreshTime) {
     cancel_deferred("refresh"_n.value);
-  }
-
-  void _schedule_refresh(uint64_t nextRefreshTime) {
+    
     transaction t{};
     t.actions.emplace_back(permission_level(_self, "active"_n),
               					   _self, "refresh"_n,
@@ -88,13 +87,34 @@ private:
     t.delay_sec = nextRefreshTime;
     t.send("refresh"_n.value, _self, false);
   }
+  
+  void _scheduleNextPayout(name eosAccount, uint64_t campaignId) {
+    auto now = time_ms();
+    {
+      transaction t{};
+      t.actions.emplace_back(permission_level(_self, "active"_n),
+                					   _self, "send"_n,
+                					   make_tuple( eosAccount, campaignId ));
+      t.delay_sec = 1;
+      t.send(now, _self, false);
+    }
+  
+    {
+      transaction t{};
+      t.actions.emplace_back(permission_level(_self, "active"_n),
+                					   _self, "pay"_n,
+                					   make_tuple( campaignId ));
+      t.delay_sec = 2;
+      t.send(now + 1, _self, false);
+    }
+  }
 
 	void _stopvote(uint64_t campaignId) {
-		campaigns_i campaigns(_self, 0);
+		campaigns_i campaigns(_self, _self.value);
 		auto campaignItem = campaigns.find(campaignId);
 		eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 
-		auto scope = campaignItem->scope;
+		auto scope = campaignItem->campaignId;
 
 		milestones_i milestones(_self, scope);
 		auto milestoneId = campaignItem->currentMilestone;
@@ -115,11 +135,11 @@ private:
 	}
 
 	void _startvote(uint64_t campaignId, uint8_t kind) {
-		campaigns_i campaigns(_self, 0);
+		campaigns_i campaigns(_self, _self.value);
 		auto campaignItem = campaigns.find(campaignId);
 		eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 
-		auto scope = campaignItem->scope;
+		auto scope = campaignItem->campaignId;
 
 		// check if campaign ended & successfully
 		// to-do
@@ -165,7 +185,7 @@ private:
 	} // void _startvote
 
 	void _updateCampaignsCount(uint64_t scope) {
-		information_i information(_self, 0);
+		information_i information(_self, _self.value);
 		auto lambda = [&](auto& row) {
 			row.key = 0;
 			row.campaignsCount = scope + 1;
@@ -179,7 +199,7 @@ private:
 	} // void _updateCampaignsCount
 
 	uint64_t _getCampaignsCount() {
-		information_i information(_self, 0);
+		information_i information(_self, _self.value);
 		for (auto& item : information) {
 			return item.campaignsCount;
 		}
@@ -198,15 +218,6 @@ private:
     	}
     	return total;
 	} // _getContributionQuantity
-
-	int64_t _getScope(uint64_t campaignId) {
-		campaigns_i campaigns(_self, 0);
-		auto campaignItem = campaigns.find(campaignId);
-		if (campaignItem != campaigns.end()) {
-			return campaignItem->scope;
-		}
-		return -1;
-	} // int64_t _getScope
 
   // structs
 
@@ -234,7 +245,6 @@ private:
 		uint64_t publicTokenPercent;
 		uint64_t tokenSupply;
 
-		uint64_t scope;
 		asset raised;
 		uint64_t backersCount;
 		uint8_t currentMilestone;

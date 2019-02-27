@@ -23,11 +23,11 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
   _verify(eosAccount, userId);
 
 	// fetch campaign
-	campaigns_i campaigns(_self, 0);
+	campaigns_i campaigns(_self, _self.value);
 	auto campaignItem = campaigns.find(campaignId);
 	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 
-	auto scope = campaignItem->scope;
+	auto scope = campaignItem->campaignId;
 	auto isNotFounder = eosAccount != campaignItem->founderEosAccount && 
 						userId != campaignItem->founderUserId;
 	eosio_assert(isNotFounder, "campaign founder can not contribute");
@@ -42,10 +42,8 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	asset previous = _getContributionQuantity(scope, userId);
 	asset total = previous + quantity;
 
-	eosio_assert(campaignItem->maxUserContribution >= total, 
-		"you can not contribute this much");
-	eosio_assert(campaignItem->minUserContribution <= total, 
-		"you can not contribute this little");
+	eosio_assert(campaignItem->maxUserContribution >= total, "you can not contribute this much");
+	eosio_assert(campaignItem->minUserContribution <= total, "you can not contribute this little");
 
 	// to-do check campaign cap?
 
@@ -56,8 +54,7 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	// upsert
 	if (contributionItem != contributions.end()) {
 		auto inUse = contributionItem->userId == userId;
-		eosio_assert(inUse, 
-			"this eos account was used to contrubute by another scruge user");
+		eosio_assert(inUse, "this eos account was used to contrubute by another scruge user");
 
 		contributions.modify(contributionItem, same_payer, [&](auto& r) {
 			r.quantity += quantity;
@@ -89,8 +86,7 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 } // void scrugex::transfer
 
 
-void scrugex::newcampaign(
-	uint64_t campaignId, uint64_t founderUserId, name founderEosAccount,
+void scrugex::newcampaign(uint64_t founderUserId, name founderEosAccount,
 	asset softCap, asset hardCap, uint64_t initialFundsReleasePercent,
 	asset maxUserContribution, asset minUserContribution,
 	uint64_t publicTokenPercent, uint64_t tokenSupply,
@@ -98,37 +94,24 @@ void scrugex::newcampaign(
 	uint64_t annualInflationPercentStart, uint64_t annualInflationPercentEnd,
 	vector<milestoneInfo> milestones) {
 
-	require_auth(_self);
+	require_auth(founderEosAccount);
 
 	// check for duplicate campaign
-	campaigns_i campaigns(_self, 0);
-	auto item = campaigns.find(campaignId);
-	auto doesntexist = item == campaigns.end() || campaigns.begin() == campaigns.end();
-	eosio_assert(doesntexist, "campaign with this id already exists");
-
-	int count = _getCampaignsCount();
-	int scope = count;
-
-	_updateCampaignsCount(scope);
-
+	campaigns_i campaigns(_self, _self.value);
+	
 	// to-do validate arguments (make sure it's complete)
-	eosio_assert(is_account(founderEosAccount),
-	 	"founder's account does not exist");
-	eosio_assert(softCap < hardCap, 
-		"hard cap should be higher than soft cap");
-	eosio_assert(tokenSupply > 100000, 
-		"supply can not be lower than 100,000 tokens");
-	eosio_assert(startTimestamp < endTimestamp,
-	 	"campaign end can not be earlier than campaign start");
-	eosio_assert(milestones.size() > 0,
-	 	"no milestones passed");
+	eosio_assert(softCap < hardCap, "hard cap should be higher than soft cap");
+	eosio_assert(tokenSupply > 100000, "supply can not be lower than 100,000 tokens");
+	eosio_assert(startTimestamp < endTimestamp, "campaign end can not be earlier than campaign start");
+	eosio_assert(milestones.size() > 0, "no milestones passed");
+	
 	eosio_assert(annualInflationPercentStart <= annualInflationPercentEnd, 
-		"incorrect range passed for annualInflationPercent");
+	  "incorrect range passed for annualInflationPercent");
 	eosio_assert(initialFundsReleasePercent < 500000, 
 		"initial funds release can not be higher than 50%");
 
 	campaigns.emplace(_self, [&](auto& r) {
-		r.campaignId = campaignId;
+		r.campaignId = campaigns.available_primary_key();
 		r.founderUserId = founderUserId;
 		r.founderEosAccount = founderEosAccount;
 		r.softCap = softCap;
@@ -140,7 +123,6 @@ void scrugex::newcampaign(
 		r.minUserContribution = minUserContribution;
 		r.startTimestamp = startTimestamp;
 		r.endTimestamp = endTimestamp;
-		r.scope = scope;
 		r.raised = asset(0, EOS_SYMBOL);
 		r.currentMilestone = 0;
 		r.status = Status::funding;
@@ -148,6 +130,9 @@ void scrugex::newcampaign(
 		r.annualInflationPercentEnd = annualInflationPercentEnd;
 		r.timestamp = time_ms();
 	});
+
+	int scope = _getCampaignsCount();
+	_updateCampaignsCount(scope);
 
 	milestones_i table(_self, scope);
 	auto lastDeadline = endTimestamp;
@@ -183,17 +168,16 @@ void scrugex::vote(name eosAccount, uint64_t userId, uint64_t campaignId, bool v
 
 	_verify(eosAccount, userId);
 
-	campaigns_i campaigns(_self, 0);
+	campaigns_i campaigns(_self, _self.value);
 	auto campaignItem = campaigns.find(campaignId);
 	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 
 	eosio_assert(eosAccount != campaignItem->founderEosAccount,
-					"campaign founder can not participate in the voting");
+	  "campaign founder can not participate in the voting");
 
-	eosio_assert(campaignItem->status == Status::activeVote,
-					"voting is not currently held");
+	eosio_assert(campaignItem->status == Status::activeVote, "voting is not currently held");
 
-	auto scope = campaignItem->scope;
+	auto scope = campaignItem->campaignId;
 	auto quantity = _getContributionQuantity(scope, userId);
 	eosio_assert(quantity.amount > 0, "only investors can participate in the voting");
 
@@ -222,16 +206,20 @@ void scrugex::vote(name eosAccount, uint64_t userId, uint64_t campaignId, bool v
 		r.positiveVotes += vote;
 	});
 	
+	// to-do check if should maybe end the voting
+	
 } // void scrugex::vote
 
 
 void scrugex::extend(uint64_t campaignId) {
-	campaigns_i campaigns(_self, 0);
+	campaigns_i campaigns(_self, _self.value);
 	auto campaignItem = campaigns.find(campaignId);
 	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 
 	require_auth(campaignItem->founderEosAccount);
-	_startvote(campaignId, 0);
+	
+	_startvote(campaignId, VoteKind::extendDeadline);
+	
 } // void scrugex::extend
 
 
@@ -239,8 +227,9 @@ void scrugex::refresh() {
 	require_auth(_self);
 
 	auto now = time_ms();
-	campaigns_i campaigns(_self, 0);
+	campaigns_i campaigns(_self, _self.value);
 	
+	// refresh again in 5 minutes if nothing else turns up
 	uint64_t nextRefreshTime = 300;
 
 	for (auto& campaignItem: campaigns) {
@@ -302,7 +291,7 @@ void scrugex::refresh() {
 		
 		// check for ongoing voting
 
-		auto scope = campaignItem.scope;
+		auto scope = campaignItem.campaignId;
 		milestones_i milestones(_self, scope);
 		auto milestoneId = campaignItem.currentMilestone;
 		auto currentMilestoneItem = milestones.find(milestoneId);
@@ -312,7 +301,7 @@ void scrugex::refresh() {
 		for (auto& votingItem: voting) { // to-do improve search for active voting
 			if (votingItem.milestoneId == milestoneId &&
 				votingItem.active &&
-				votingItem.kind == 0) {
+				votingItem.kind == VoteKind::extendDeadline) {
 
 				// to-do check if can close vote earlier
 
@@ -348,41 +337,50 @@ void scrugex::refresh() {
 		if (currentMilestoneItem->deadline < now) {
 		
 			// check if voting for deadline is over
-			bool shouldStartNextVote = true;
+			
+			// will start voting unless told not to 
+			bool shouldStartNextMilestoneVoting = true;
+			
 			for (auto& votingItem: voting) { // to-do improve search for active voting
 				if (votingItem.milestoneId == milestoneId &&
 					votingItem.active &&
-					votingItem.kind == 1) {
+					votingItem.kind == VoteKind::milestoneResult) {
 
-					shouldStartNextVote = false;
+          // vote has just ended, don't start another one
+					shouldStartNextMilestoneVoting = false;
 					
 					// to-do check if can close vote earlier
 					
+					// Voting ended
 					if (votingItem.endTimestamp < now || votingItem.voters == campaignItem.backersCount) {
 						_stopvote(campaignItem.campaignId);
 						
 						if (votingItem.positiveVotes >= votingItem.voters * T1) {
-
-							// release part of money
+						  
+					    // milestone vote success
+					    
+							// release this part of funds 
 							auto percent = get_percent(campaignItem.raised.amount, 
 													   currentMilestoneItem->fundsReleasePercent);
 							auto quantity = campaignItem.raised;
 							quantity.amount = percent;
-							_transfer(campaignItem.founderEosAccount, quantity, 
-								"scruge: milestone payment");
+							_transfer(campaignItem.founderEosAccount, quantity, "scruge: milestone payment");
 
-							// next milestone
+              // get next milestone
 							uint64_t nextMilestoneId = campaignItem.currentMilestone + 1;
 							auto nextMilestoneItem = milestones.find(nextMilestoneId);
 
 							if (nextMilestoneItem == milestones.end()) {
 
+                // no more milestones
 								// campaign ended successfully
 								campaigns.modify(campaignItem, same_payer, [&](auto& r) {
 									r.status = Status::closed;
 								});
 							}
 							else {
+							  
+							  // switch milestone
 								campaigns.modify(campaignItem, same_payer, [&](auto& r) {
 									r.currentMilestone = nextMilestoneId;
 									r.status = Status::milestone;
@@ -390,11 +388,14 @@ void scrugex::refresh() {
 							}
 						}
 						else {
-							// deadline vote failed
+						  
+							// milestone vote failed
 							// wait for some time for founder to return funds or start extend voting
 							campaigns.modify(campaignItem, same_payer, [&](auto& r) {
 								r.status = Status::waiting;
 							});
+							
+							// to-do actual waiting 
 						}
 					}
 					
@@ -404,28 +405,26 @@ void scrugex::refresh() {
 				}
 			}
 
-			if (shouldStartNextVote) {
-				_startvote(campaignItem.campaignId, 1);
+			if (shouldStartNextMilestoneVoting) {
+				_startvote(campaignItem.campaignId, VoteKind::milestoneResult);
 			}
 		}
 	}
 
   if (nextRefreshTime != 0) {
-    _cancel_refresh();
-  	_schedule_refresh(nextRefreshTime);
+  	_scheduleRefresh(nextRefreshTime);
   }
   
 } // void scrugex::refresh
-
 
 void scrugex::send(name eosAccount, uint64_t campaignId) {
   require_auth(_self);
   
   // fetch campaign
-	campaigns_i campaigns(_self, 0);
+	campaigns_i campaigns(_self, _self.value);
 	auto campaignItem = campaigns.find(campaignId);
 	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
-	auto scope = campaignItem->scope;
+	auto scope = campaignItem->campaignId;
 	
 	eosio_assert(campaignItem->status == Status::refunding || campaignItem->status == Status::distributing, 
 	    "this campaign is not paying anyone right now");
@@ -455,10 +454,10 @@ void scrugex::pay(uint64_t campaignId) {
   require_auth(_self);
   
   // fetch campaign
-	campaigns_i campaigns(_self, 0);
+	campaigns_i campaigns(_self, _self.value);
 	auto campaignItem = campaigns.find(campaignId);
 	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
-	auto scope = campaignItem->scope;
+	auto scope = campaignItem->campaignId;
 	
 	eosio_assert(campaignItem->status == Status::refunding || campaignItem->status == Status::distributing, 
 	    "this campaign is not paying anyone right now");
@@ -473,7 +472,7 @@ void scrugex::pay(uint64_t campaignId) {
       campaigns.modify(campaignItem, same_payer, [&](auto& r) {
 				r.status = Status::closed;
 			});
-			_schedule_refresh(1);
+			_scheduleRefresh(1);
 			return;
   }
   
@@ -484,25 +483,8 @@ void scrugex::pay(uint64_t campaignId) {
     r.attemptedPayment = true;
   });
   
-  // schedule 
-  auto now = time_ms();
-  {
-    transaction t{};
-    t.actions.emplace_back(permission_level(_self, "active"_n),
-              					   _self, "send"_n,
-              					   make_tuple( eosAccount, campaignId ));
-    t.delay_sec = 1;
-    t.send(now, _self, false);
-  }
-
-  {
-    transaction t{};
-    t.actions.emplace_back(permission_level(_self, "active"_n),
-              					   _self, "pay"_n,
-              					   make_tuple( campaignId ));
-    t.delay_sec = 1;
-    t.send(now + 1, _self, false);
-  }
+  // schedule
+  _scheduleNextPayout(eosAccount, campaignId);
   
 } // void scrugex::startrefund
 
@@ -514,11 +496,11 @@ void scrugex::destroy() {
 	require_auth(_self);
 	uint64_t scopes = _getCampaignsCount();
 
-	information_i table(_self, 0);
+	information_i table(_self, _self.value);
 	auto item = table.begin();
 	while(item != table.end()) { item = table.erase(item); }
 
-	campaigns_i campaigns(_self, 0);
+	campaigns_i campaigns(_self, _self.value);
 	auto ca_item = campaigns.begin();
 	while(ca_item != campaigns.end()) { ca_item = campaigns.erase(ca_item); }
 
