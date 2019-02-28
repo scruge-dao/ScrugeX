@@ -172,7 +172,7 @@ private:
 		auto v_item = voters.begin();
 		while(v_item != voters.end()) { v_item = voters.erase(v_item); }
 
-		voting.emplace(founderEosAccount, [&](auto& r) {
+		voting.emplace(campaignItem->founderEosAccount, [&](auto& r) {
 			r.voteId = voteId;
 			r.kind = kind;
 			r.milestoneId = milestoneId;
@@ -286,6 +286,7 @@ private:
 		uint64_t primary_key() const { return eosAccount.value; }
 		uint64_t by_userId() const { return userId; }
 		uint64_t by_not_attempted_payment() const { return attemptedPayment ? 1 : 0; }
+		uint64_t by_amount_desc() const { return numeric_limits<uint64_t>::max() - quantity.amount; }
 	};
 
 	TABLE voting {
@@ -318,10 +319,9 @@ private:
 	typedef multi_index<"voting"_n, voting> voting_i;
 
 	typedef multi_index<"contribution"_n, contribution,
-			indexed_by<"byuserid"_n, const_mem_fun<contribution, uint64_t,
-												   &contribution::by_userId>>,
-			indexed_by<"byap"_n, const_mem_fun<contribution, uint64_t,
-												   &contribution::by_not_attempted_payment>> 
+			indexed_by<"byuserid"_n, const_mem_fun<contribution, uint64_t, &contribution::by_userId>>,
+			indexed_by<"byap"_n, const_mem_fun<contribution, uint64_t, &contribution::by_not_attempted_payment>>,
+			indexed_by<"byamountdesc"_n, const_mem_fun<contribution, uint64_t, &contribution::by_amount_desc>>
 												   > contributions_i;
 	
 	// to access kyc/aml table
