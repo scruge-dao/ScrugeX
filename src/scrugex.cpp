@@ -10,7 +10,6 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	// check transfer
 	eosio_assert(quantity.symbol.is_valid(), "invalid quantity");
 	eosio_assert(quantity.amount > 0, "only positive quantity allowed");
-	eosio_assert(quantity.symbol == EOS_SYMBOL, "only EOS tokens allowed");
 	
 	eosio_assert(memo != "", "incorrectly formatted memo");
 	eosio_assert(is_number(memo), "campaignId is a number");
@@ -25,68 +24,89 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 
 	auto scope = campaignItem->campaignId;
-	auto isNotFounder = eosAccount != campaignItem->founderEosAccount;
-	eosio_assert(isNotFounder, "campaign founder can not contribute");
+	auto code = name(get_code());
 	
-	// get userId from kyc or eosAccount
-	uint64_t userId = _verify(eosAccount, campaignItem->kycEnabled);
+	// founder is putting money in escrow
+  if (eosAccount == campaignItem->founderEosAccount) {
+    
+    eosio_assert(campaignItem->tokensReceived == false, "you have already locked transferred tokens");
+    eosio_assert(campaignItem->status == Status::funding, "campaign has already started");
+    eosio_assert(code == campaignItem->tokenContract, "you have to use the contract specified");
+    eosio_assert(quantity == campaignItem->supplyForSale, "you have to transfer specified amount for sale");
+    
+    campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+      r.tokensReceived = true;
+    });
+    
+	} 
 	
-	eosio_assert(time > campaignItem->startTimestamp, "campaign has not started yet");
-	eosio_assert(time < campaignItem->endTimestamp, "campaign has ended");
-	eosio_assert(campaignItem->status == Status::funding, "campaign is not running");
-
-	// check if allowed to invest this amount
-	asset previous = _getContributionQuantity(scope, userId);
-	asset total = previous + quantity;
-	
-	asset max = get_percent(campaignItem->hardCap, campaignItem->maxUserContributionPercent);
-	asset min = get_percent(campaignItem->hardCap, campaignItem->minUserContributionPercent);
-	eosio_assert(max > total, "you can not contribute this much");
-	eosio_assert(min < total, "you can not contribute this little");
-
-	// to-do check campaign cap?
-
-	// upsert contribution
-	contributions_i contributions(_self, scope);
-	auto contributionItem = contributions.find(eosAccount.value);
-
-	// upsert
-	if (contributionItem != contributions.end()) {
-		auto inUse = contributionItem->userId == userId;
-		eosio_assert(inUse, "this eos account was used to contrubute by another scruge user");
-
-		contributions.modify(contributionItem, same_payer, [&](auto& r) {
-			r.quantity += quantity;
-		});
-	}
+	// backer is investing
 	else {
-		// advance backers
-		if (previous.amount == 0) {
-			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-				r.backersCount += 1;
-			});
-		}
-
-		contributions.emplace(_self, [&](auto& r) {
-			r.userId = userId;
-			r.eosAccount = eosAccount;
-			r.quantity = quantity;
-			
-			r.attemptedPayment = false;
-			r.isPaid = false;
-		});
+    
+    // check token contract
+    eosio_assert(code == "eosio.token"_n, "you have to use the system EOS token");
+	
+    // get userId from kyc or eosAccount
+    uint64_t userId = _verify(eosAccount, campaignItem->kycEnabled);
+  	
+    eosio_assert(time > campaignItem->startTimestamp, "campaign has not started yet");
+    eosio_assert(time < campaignItem->endTimestamp, "campaign has ended");
+    eosio_assert(campaignItem->status == Status::funding, "campaign is not running");
+    eosio_assert(campaignItem->tokensReceived == true, "campaign has not been supplied with tokens to sale");
+  
+  	// check if allowed to invest this amount
+    asset previous = _getContributionQuantity(scope, userId);
+    asset total = previous + quantity;
+  	
+    asset max = get_percent(campaignItem->hardCap, campaignItem->maxUserContributionPercent);
+    asset min = get_percent(campaignItem->hardCap, campaignItem->minUserContributionPercent);
+    eosio_assert(max > total, "you can not contribute this much");
+    eosio_assert(min < total, "you can not contribute this little");
+  
+  	// to-do check campaign cap?
+  
+  	// upsert contribution
+  	contributions_i contributions(_self, scope);
+  	auto contributionItem = contributions.find(eosAccount.value);
+  
+  	// upsert
+  	if (contributionItem != contributions.end()) {
+  		auto inUse = contributionItem->userId == userId;
+  		eosio_assert(inUse, "this eos account was used to contrubute by another scruge user");
+  
+  		contributions.modify(contributionItem, same_payer, [&](auto& r) {
+  			r.quantity += quantity;
+  		});
+  	}
+  	else {
+  		// advance backers
+  		if (previous.amount == 0) {
+  			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+  				r.backersCount += 1;
+  			});
+  		}
+  
+  		contributions.emplace(_self, [&](auto& r) {
+  			r.userId = userId;
+  			r.eosAccount = eosAccount;
+  			r.quantity = quantity;
+  			
+  			r.attemptedPayment = false;
+  			r.isPaid = false;
+  		});
+  	}
+  
+  	// update raised in campaigns
+  	campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+  		r.raised += quantity;
+  	});
 	}
-
-	// update raised in campaigns
-	campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-		r.raised += quantity;
-	});
 	
 } // void scrugex::transfer
 
 
 void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap, 
-		uint64_t initialFundsReleasePercent, bool kycEnabled,
+		asset supplyForSale, name tokenContract, uint64_t initialFundsReleasePercent, bool kycEnabled,
 		uint64_t maxUserContributionPercent, uint64_t minUserContributionPercent,
 		uint64_t startTimestamp, uint64_t endTimestamp, vector<milestoneInfo> milestones) {
 
@@ -119,6 +139,9 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 		r.excessReturned = asset(0, EOS_SYMBOL);
 		r.kycEnabled = kycEnabled;
 		r.releasedPercent = 0;
+		r.supplyForSale = supplyForSale;
+		r.tokenContract = tokenContract;
+		r.tokensReceived = false;
 		r.waitingEndTimestamp = 0;
 	});
 
@@ -651,7 +674,7 @@ extern "C" {
 						(newcampaign)(vote)(extend)(refresh)(send)(pay) (destroy))
 			}
 		}
-		else if (code == "eosio.token"_n.value && action == "transfer"_n.value) {
+		else if (action == "transfer"_n.value && code != receiver) {
 			execute_action(name(receiver), name(code), &scrugex::transfer);
 		}
 	}

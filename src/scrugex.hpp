@@ -22,7 +22,7 @@ public:
 	void transfer(name from, name to, asset quantity, string memo);
 
 	ACTION newcampaign(name founderEosAccount, asset softCap, asset hardCap, 
-		uint64_t initialFundsReleasePercent, bool kycEnabled,
+	asset supplyForSale, name tokenContract, uint64_t initialFundsReleasePercent, bool kycEnabled,
 		uint64_t maxUserContributionPercent, uint64_t minUserContributionPercent,
 		uint64_t startTimestamp, uint64_t endTimestamp, vector<milestoneInfo> milestones);
 
@@ -342,18 +342,25 @@ private:
 		uint64_t endTimestamp;
 		uint64_t waitingEndTimestamp;
 
+    // new tokens
+    name tokenContract;
+		asset supplyForSale; // amount of tokens to sale
+		bool tokensReceived;
+		
+		// investment tokens (EOS)
 		asset softCap;
 		asset hardCap;
+		asset raised;
+		asset excessReturned;
+		
 		uint64_t initialFundsReleasePercent;
 		uint64_t maxUserContributionPercent;
 		uint64_t minUserContributionPercent;
-
-		asset raised;
 		uint64_t releasedPercent;
+		
 		uint64_t backersCount;
 		uint8_t currentMilestone;
 		bool kycEnabled;
-		asset excessReturned;
 
 		uint64_t primary_key() const { return campaignId; }
 	};
