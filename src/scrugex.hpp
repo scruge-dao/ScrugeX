@@ -263,7 +263,7 @@ private:
 		auto v_item = voters.begin();
 		while(v_item != voters.end()) { v_item = voters.erase(v_item); }
 
-		voting.emplace(campaignItem->founderEosAccount, [&](auto& r) {
+		voting.emplace(_self, [&](auto& r) {
 			r.voteId = voteId;
 			r.kind = kind;
 			r.milestoneId = milestoneId;

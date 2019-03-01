@@ -288,7 +288,7 @@ void scrugex::refresh() {
 			auto quantity = get_percent(campaignItem.raised, campaignItem.initialFundsReleasePercent);
 			_transfer(campaignItem.founderEosAccount, quantity, "ScrugeX: Initial Funds");
 
-			// start milestones 
+			// start milestones
 			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
 				r.releasedPercent += campaignItem.initialFundsReleasePercent;
 				r.status = Status::milestone;
@@ -423,10 +423,12 @@ void scrugex::refresh() {
 							if (nextMilestoneItem == milestones.end()) {
 
 								// no more milestones
-								// campaign ended successfully
+								// start distributing tokens
 								campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-									r.status = Status::closed;
+									r.status = Status::distributing;
 								});
+								
+								_schedulePay(campaignItem.campaignId);
 							}
 							else {
 								
@@ -489,7 +491,7 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 	// if refunding (both not reached soft cap or milestone vote failed)
 	if (campaignItem->status == Status::refunding) {
 		
-		// get first in contributions
+		// get contribution
 		contributions_i contributions(_self, scope);
 		auto contributionItem = contributions.find(eosAccount.value);
 		
@@ -500,17 +502,33 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 		
 		_transfer(eosAccount, asset(amount, EOS_SYMBOL), "ScrugeX: Refund for campaign");
 		
-		// remove from contributions
+		// set is paid 
 		contributions.modify(contributionItem, same_payer, [&](auto& r) {
 			 r.attemptedPayment = true;
 			 r.isPaid = true;
 		});
 	}
 	
-	// if campaign is over and tokens are distributing to buyers
+	// if campaign is over and tokens are distributing to backers
 	else if (campaignItem->status == Status::distributing) {
 		
+		// get contribution
+		contributions_i contributions(_self, scope);
+		auto contributionItem = contributions.find(eosAccount.value);
 		
+		eosio_assert(contributionItem->isPaid == false, "this user has already been paid");
+		
+		uint64_t paymentAmount = campaignItem->supplyForSale.amount *
+		          contributionItem->quantity.amount / campaignItem->raised.amount; // to-do CHECK FOR OVERFLOW
+
+		auto paymentQuantity = asset(paymentAmount, campaignItem->supplyForSale.symbol);
+		_transfer(eosAccount, paymentQuantity, "ScrugeX: Tokens Distribution", campaignItem->tokenContract);
+		
+		// set is paid 
+		contributions.modify(contributionItem, same_payer, [&](auto& r) {
+			 r.attemptedPayment = true;
+			 r.isPaid = true;
+		});
 	}
 	
 	// if returning excess funds (over hard cap)
@@ -524,7 +542,7 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 
 		_transfer(eosAccount, excessfundsItem->quantity, "ScrugeX: Excessive Funding Return");
 		
-		// remove from contributions
+		// set is paid 
 		excessfunds.modify(excessfundsItem, same_payer, [&](auto& r) {
 			 r.attemptedPayment = true;
 			 r.isPaid = true;
@@ -550,7 +568,8 @@ void scrugex::pay(uint64_t campaignId) {
 			"this campaign is not paying anyone right now");
 	
 	// if refunding (both not reached soft cap or milestone vote failed)
-	if (campaignItem->status == Status::refunding) {
+	// or if campaign is over and tokens are distributing to buyers
+	if (campaignItem->status == Status::refunding || campaignItem->status == Status::distributing) {
 		
 		// get first in contributions
 		contributions_i contributions(_self, scope);
@@ -559,6 +578,7 @@ void scrugex::pay(uint64_t campaignId) {
 		
 		// if doesn't exist, close campaign, go back to refresh cycle
 		if (item != notAttemptedContributions.end()) {
+		  
 			// set attempted payment
 			auto eosAccount = item->eosAccount;
 			auto contributionItem = contributions.find(eosAccount.value);
@@ -580,11 +600,6 @@ void scrugex::pay(uint64_t campaignId) {
 			// schedule refresh and exit (to not schedule next payout)
 			_scheduleRefresh(1);
 		}
-	}
-	
-	// if campaign is over and tokens are distributing to buyers
-	else if (campaignItem->status == Status::distributing) {
-		
 	}
 	
 	// if returning excess funds (over hard cap)
