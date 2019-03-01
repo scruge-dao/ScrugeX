@@ -101,7 +101,7 @@ private:
 	
 	} // void _scheduleSend
 	
-	bool _willRefundExcessiveFunds(uint64_t campaignId) {
+  bool _willRefundExcessiveFunds(uint64_t campaignId) {
 		campaigns_i campaigns(_self, _self.value);
 		auto campaignItem = campaigns.find(campaignId);
     eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
@@ -110,67 +110,74 @@ private:
     uint64_t hardCap = campaignItem->hardCap.amount;
     uint64_t softCap = campaignItem->softCap.amount;
   	
-    if (startSum < hardCap) { return false; }
-  	
-    uint64_t backersCount = campaignItem->backersCount;
-    uint64_t e = 0;
-    uint64_t i = 0;
-	
 		contributions_i contributions(_self, campaignId);
 		auto sortedContributions = contributions.get_index<"byamountdesc"_n>();
-		for (auto& item : sortedContributions) {
-			uint64_t element = item.quantity.amount;
-		
-      if (element * i + startSum < hardCap) {
-      e = element;
-
-      uint64_t k = 10000000;
-      while (e * i + startSum < hardCap && k > 0) {
-        while (e * i + startSum < hardCap) {
-          e += k;
-        }
-        e -= k;
-        k /= 10;
-      }
-      break;
-      }
-      startSum -= element;
-      i += 1;
-    }
-		
-    uint64_t ii = 0;
-    uint64_t raised = campaignItem->raised.amount;
-    uint64_t newRaised = campaignItem->raised.amount;
+  		
+  	// distribution algorithm pt. 2
+    if (startSum > hardCap) {
+    	
+      uint64_t backersCount = campaignItem->backersCount;
+      uint64_t e = 0;
+      uint64_t i = 0;
   	
-  	// contributions_i contributions(_self, campaignId);
-    for (auto& item : contributions) {
-		
-  		if (item.quantity.amount < e) {
-  		  continue;
-  		}
+      for (auto& item : sortedContributions) {
+        uint64_t element = item.quantity.amount;
+  		  
+        if (element * i + startSum < hardCap) {
+          e = element;
+    
+          uint64_t k = 10000000;
+          while (k > 0) {
+            while (e * i + startSum < hardCap) {
+              e += k;
+            }
+            e -= k;
+            k /= 10;
+          }
+          break;
+        }
+        startSum -= element;
+        i += 1;
+      }
   		
-  		excessfunds_i excessfunds(_self, campaignId);
-  		auto contribution = contributions.find(item.eosAccount.value);
-  		uint64_t returnAmount = contribution->quantity.amount - e;
+      uint64_t raised = campaignItem->raised.amount;
+      uint64_t newRaised = campaignItem->raised.amount;
+    	
+      for (auto& item : contributions) {
+    		if (item.quantity.amount < e) {
+          continue;
+        }
+    		
+        excessfunds_i excessfunds(_self, campaignId);
+        auto contribution = contributions.find(item.eosAccount.value);
+        uint64_t returnAmount = contribution->quantity.amount - e;
+    		
+    		excessfunds.emplace(_self, [&](auto& r) {
+          r.attemptedPayment = false;
+      		r.isPaid = false;
+      		r.eosAccount = contribution->eosAccount;
+      		r.quantity = asset(returnAmount, contribution->quantity.symbol);
+    		});
+    		contributions.modify(contribution, same_payer, [&](auto& r) {
+    		  r.quantity = asset(e, r.quantity.symbol);
+    		});
+    		newRaised -= returnAmount;
+      }
   		
-  		excessfunds.emplace(_self, [&](auto& r) {
-    		r.attemptedPayment = false;
-    		r.isPaid = false;
-    		r.eosAccount = contribution->eosAccount;
-    		r.quantity = asset(returnAmount, contribution->quantity.symbol);
-  		});
-  		contributions.modify(contribution, same_payer, [&](auto& r) {
-  		  r.quantity = asset(e, r.quantity.symbol);
-  		});
-  		newRaised -= returnAmount;
-		}
-		
-    campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-      r.raised = asset(newRaised, r.raised.symbol);
-      r.excessReturned = asset(raised - newRaised, r.raised.symbol);
-      r.status = Status::excessReturning;
-    });
-	
+      campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+        r.raised = asset(newRaised, r.raised.symbol);
+        r.excessReturned = asset(raised - newRaised, r.raised.symbol);
+        r.status = Status::excessReturning;
+      });
+  	  
+    }
+    // distribution algorithm pt. 3
+    else {
+      
+      
+      
+    }
+	  
     // to-do calculate per user % excess
 		
 		// schedule payout
