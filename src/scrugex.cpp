@@ -116,6 +116,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 		r.raised = asset(0, EOS_SYMBOL);
 		r.currentMilestone = 0;
 		r.status = Status::funding;
+		r.excessReturned = asset(0, EOS_SYMBOL);
 		r.kycEnabled = kycEnabled;
 		r.releasedPercent = 0;
 		r.waitingEndTimestamp = 0;
@@ -231,7 +232,51 @@ void scrugex::refresh() {
 			continue;
 		}
 		
-		// check if waiting time has passed 
+    // funding is complete
+		if (campaignItem.status == Status::funding) {
+
+      // did not reach soft cap, refund all money
+      if (campaignItem.raised < campaignItem.softCap) {
+      
+  		  _refund(campaignItem.campaignId);
+  		  
+        // don't schedule refresh if a campaign is refunding
+        nextRefreshTime = 0;
+        break;
+      }
+      
+      if (campaignItem.raised > campaignItem.hardCap) {  
+        
+        // distribution algorithm
+        if (_willRefundExcessiveFunds(campaignItem.campaignId)) {
+          
+          // payout process is launched
+          nextRefreshTime = 0;
+        }
+        else {
+          
+          // wait for next refresh cycle to continue setup below
+          nextRefreshTime = 1;
+        }
+        break;
+      }
+      
+			// release initial funds
+			auto quantity = get_percent(campaignItem.raised, campaignItem.initialFundsReleasePercent);
+			_transfer(campaignItem.founderEosAccount, quantity, "ScrugeX: Initial Funds");
+
+      // start milestones 
+      campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+			  r.releasedPercent += campaignItem.initialFundsReleasePercent;
+				r.status = Status::milestone;
+			});
+
+      // complete this transaction and run next one in a second
+      nextRefreshTime = 1;
+			break;
+		}
+		
+		// check if waiting time has passed
 		if (campaignItem.status == Status::waiting && campaignItem.waitingEndTimestamp < now) {
 		  
 	    // founder failed to act, refunding
@@ -242,22 +287,14 @@ void scrugex::refresh() {
 			break;
 		}
 
-    // check if still funding but did not reach soft cap
-		if (campaignItem.status == Status::funding && campaignItem.raised < campaignItem.softCap) {
-
-			// did not reach soft cap, refund all money
-		  _refund(campaignItem.campaignId);
-		  
-      // don't schedule refresh if a campaign is refunding
-      nextRefreshTime = 0;
-			break;
-		}
-		
 		// check if supposed to be refunding
-		if (campaignItem.status == Status::refunding || campaignItem.status == Status::distributing) {
+		if (campaignItem.status == Status::refunding || 
+		    campaignItem.status == Status::distributing ||
+		    campaignItem.status == Status::excessReturning) {
 		  
 		  // schedule deferred transaction to refund or ditribute
 		  // this should fail if another one is scheduled
+		  // to-do make sure it fails or restarts if needed
 		  _pay(campaignItem.campaignId);
 		  
 		  // don't schedule refresh if a campaign is refunding
@@ -265,27 +302,6 @@ void scrugex::refresh() {
 		  break;
 		}
 
-    // initialize milestones mode if funding complete
-		if (campaignItem.status == Status::funding) {
-
-			// release initial funds
-			auto percent = get_percent(campaignItem.raised.amount,
-									   campaignItem.initialFundsReleasePercent);
-
-			auto quantity = campaignItem.raised;
-			quantity.amount = percent;
-			_transfer(campaignItem.founderEosAccount, quantity, "ScrugeX: Initial Funds");
-
-			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-			  r.releasedPercent += campaignItem.initialFundsReleasePercent;
-				r.status = Status::milestone;
-			});
-
-      // complete this transaction and run next one in a second
-      nextRefreshTime = 1;
-			break;
-		}
-		
 		// check for ongoing voting
 
 		auto scope = campaignItem.campaignId;
@@ -299,8 +315,7 @@ void scrugex::refresh() {
 		  // to-do improve search for active voting
 		
 		  // check extend deadline votings
-			if (votingItem.milestoneId == milestoneId &&
-				votingItem.active &&
+			if (votingItem.milestoneId == milestoneId && votingItem.active &&
 				votingItem.kind == VoteKind::extendDeadline) {
 
 				// to-do check if can close vote earlier
@@ -348,8 +363,7 @@ void scrugex::refresh() {
 			
 			// find ongoing milstone voting
 			for (auto& votingItem: voting) { // to-do improve search for active voting
-				if (votingItem.milestoneId == milestoneId &&
-					votingItem.active &&
+				if (votingItem.milestoneId == milestoneId && votingItem.active &&
 					votingItem.kind == VoteKind::milestoneResult) {
 
           // vote has just ended, don't start another one
@@ -444,29 +458,57 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 	
 	// this action only works when campaign is automatically refunding
 	// to request failed refund after campaign was closed, there will be another action
-	eosio_assert(campaignItem->status == Status::refunding || campaignItem->status == Status::distributing, 
-	  "this campaign is not paying anyone right now");
-  
-  // get first in contributions
-  contributions_i contributions(_self, scope);
-	auto contributionItem = contributions.find(eosAccount.value);
-	
-	eosio_assert(contributionItem->isPaid == false, "this user has already been paid");
-
+  eosio_assert(campaignItem->status == Status::refunding ||
+              campaignItem->status == Status::distributing ||
+              campaignItem->status == Status::excessReturning, 
+    "this campaign is not paying anyone right now");
+    
+  // if refunding (both not reached soft cap or milestone vote failed)
   if (campaignItem->status == Status::refunding) {
     
-    uint64_t refundPercent = 100 - campaignItem->releasedPercent;
+    // get first in contributions
+    contributions_i contributions(_self, scope);
+    auto contributionItem = contributions.find(eosAccount.value);
     
+    eosio_assert(contributionItem->isPaid == false, "this user has already been paid");
+      
+    uint64_t refundPercent = 100 - campaignItem->releasedPercent;
     uint64_t amount = get_percent(contributionItem->quantity.amount, refundPercent);
+    
     _transfer(eosAccount, asset(amount, EOS_SYMBOL), "ScrugeX: Refund for campaign");
-  }  
+    
+    // remove from contributions
+    contributions.modify(contributionItem, same_payer, [&](auto& r) {
+       r.attemptedPayment = true;
+       r.isPaid = true;
+    });
+  }
   
-  // remove from contributions
-  contributions.modify(contributionItem, same_payer, [&](auto& r) {
-     r.attemptedPayment = true;
-     r.isPaid = true;
-  });
+  // if campaign is over and tokens are distributing to buyers
+  else if (campaignItem->status == Status::distributing) {
+    
+    
+  }
+  
+  // if returning excess funds (over hard cap)
+  else if (campaignItem->status == Status::excessReturning) {
+    
+    // get first in excessfunds
+    excessfunds_i excessfunds(_self, scope);
+    auto excessfundsItem = excessfunds.find(eosAccount.value);
+    
+    eosio_assert(excessfundsItem->isPaid == false, "this user has already been paid");
 
+    _transfer(eosAccount, excessfundsItem->quantity, "ScrugeX: Excessive Funding Return");
+    
+    // remove from contributions
+    excessfunds.modify(excessfundsItem, same_payer, [&](auto& r) {
+       r.attemptedPayment = true;
+       r.isPaid = true;
+    });
+    
+  }
+  
 } // void scrugex::send
 
 
@@ -479,32 +521,80 @@ void scrugex::pay(uint64_t campaignId) {
 	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 	auto scope = campaignItem->campaignId;
 	
-	eosio_assert(campaignItem->status == Status::refunding || campaignItem->status == Status::distributing, 
+	eosio_assert(campaignItem->status == Status::refunding || 
+	            campaignItem->status == Status::distributing ||
+	            campaignItem->status == Status::excessReturning,
 	    "this campaign is not paying anyone right now");
   
-  // get first in contributions
-  contributions_i contributions(_self, scope);
-  auto notAttemptedContributions = contributions.get_index<"byap"_n>();
-	auto item = notAttemptedContributions.find(0);
-	
-  // if doesn't exist, close campaign, go back to refresh cycle
-  if (item == notAttemptedContributions.end()) {
+  // if refunding (both not reached soft cap or milestone vote failed)
+  if (campaignItem->status == Status::refunding) {
+    
+    // get first in contributions
+    contributions_i contributions(_self, scope);
+    auto notAttemptedContributions = contributions.get_index<"byap"_n>();
+    auto item = notAttemptedContributions.find(0);
+    
+    // if doesn't exist, close campaign, go back to refresh cycle
+    if (item != notAttemptedContributions.end()) {
+      // set attempted payment
+      auto eosAccount = item->eosAccount;
+      auto contributionItem = contributions.find(eosAccount.value);
+      contributions.modify(contributionItem, same_payer, [&](auto& r) {
+        r.attemptedPayment = true;
+      });
+      
+      // schedule payment and repeat 
+      _scheduleSend(eosAccount, campaignId);
+      _schedulePay(campaignId);
+    }
+    else {
+      
+      // no more payments weren't attempted, the rest can do it manually
       campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-				r.status = Status::closed;
-			});
-			_scheduleRefresh(1);
-			return;
+        r.status = Status::closed;
+      });
+      
+      // schedule refresh and exit (to not schedule next payout)
+      _scheduleRefresh(1);
+    }
   }
   
-	// set attempted payment
-	auto eosAccount = item->eosAccount;
-	auto contributionItem = contributions.find(eosAccount.value);
-  contributions.modify(contributionItem, same_payer, [&](auto& r) {
-    r.attemptedPayment = true;
-  });
+  // if campaign is over and tokens are distributing to buyers
+  else if (campaignItem->status == Status::distributing) {
+    
+  }
   
-  // schedule
-  _scheduleNextPayout(eosAccount, campaignId);
+  // if returning excess funds (over hard cap)
+  else if (campaignItem->status == Status::excessReturning) {
+    
+     // get first in excessfunds
+    excessfunds_i excessfunds(_self, scope);
+    auto notAttemptedReturns = excessfunds.get_index<"byap"_n>();
+    auto item = notAttemptedReturns.find(0);
+    
+    // if doesn't exist, close campaign, go back to refresh cycle
+    if (item != notAttemptedReturns.end()) {
+      // set attempted payment
+      auto eosAccount = item->eosAccount;
+      auto excessFundsItem = excessfunds.find(eosAccount.value);
+      excessfunds.modify(excessFundsItem, same_payer, [&](auto& r) {
+        r.attemptedPayment = true;
+      });
+      
+      // schedule payment and repeat 
+      _scheduleSend(eosAccount, campaignId);
+      _schedulePay(campaignId);
+
+    }
+    else {
+      
+      // go back to funding state and refresh (and it will start milestones)
+      campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+        r.status = Status::funding;
+      });
+      _scheduleRefresh(1);
+    }
+  }
   
 } // void scrugex::startrefund
 
@@ -540,6 +630,10 @@ void scrugex::destroy() {
 		voters_i voters(_self, i);
 		auto v_item = voters.begin();
 		while(v_item != voters.end()) { v_item = voters.erase(v_item); }
+		
+		excessfunds_i excessfunds(_self, i);
+		auto e_item = excessfunds.begin();
+		while(e_item != excessfunds.end()) { e_item = excessfunds.erase(e_item); }
 	}
 	
 } // void scrugex::destroy

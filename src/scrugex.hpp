@@ -41,7 +41,7 @@ public:
 private:
 
 	enum Status: uint8_t { funding = 0, milestone = 1, activeVote = 2, waiting = 3,
-	                       closed = 4, refunding = 5, distributing = 6 };
+	                       closed = 4, refunding = 5, distributing = 6, excessReturning = 7 };
 	
 	enum VoteKind: uint8_t { extendDeadline = 0, milestoneResult = 1 };
 
@@ -65,6 +65,128 @@ private:
 		).send();
 	} // void _pay
 
+  void _scheduleRefresh(uint64_t nextRefreshTime) {
+    cancel_deferred("refresh"_n.value);
+    
+    transaction t{};
+    t.actions.emplace_back(permission_level(_self, "active"_n),
+              					   _self, "refresh"_n,
+              					   make_tuple());
+    t.delay_sec = nextRefreshTime;
+    t.send("refresh"_n.value, _self, false);
+  } // void _scheduleRefresh
+  
+  void _schedulePay(uint64_t campaignId) {
+    {
+      transaction t{};
+      t.actions.emplace_back(permission_level(_self, "active"_n),
+                					   _self, "pay"_n,
+                					   make_tuple( campaignId ));
+      t.delay_sec = 2;
+      t.send(time_ms() + 1, _self, false);
+    }
+    
+  } //void _schedulePay
+  
+  void _scheduleSend(name eosAccount, uint64_t campaignId) {
+    auto now = time_ms();
+    {
+      transaction t{};
+      t.actions.emplace_back(permission_level(_self, "active"_n),
+                					   _self, "send"_n,
+                					   make_tuple( eosAccount, campaignId ));
+      t.delay_sec = 1;
+      t.send(time_ms(), _self, false);
+    }
+    
+  } // void _scheduleSend
+  
+	bool _willRefundExcessiveFunds(uint64_t campaignId) {
+	  campaigns_i campaigns(_self, _self.value);
+		auto campaignItem = campaigns.find(campaignId);
+		eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
+
+    uint64_t startSum = campaignItem->raised.amount;
+    uint64_t hardCap = campaignItem->hardCap.amount;
+    uint64_t softCap = campaignItem->softCap.amount;
+    
+    if (startSum < hardCap) { return false; }
+    
+    uint64_t backersCount = campaignItem->backersCount;
+    uint64_t e = 0;
+    uint64_t i = 0;
+    
+	  contributions_i contributions(_self, campaignId);
+	  auto sortedContributions = contributions.get_index<"byamountdesc"_n>();
+		for (auto& item : sortedContributions) {
+		  
+		  uint64_t element = item.quantity.amount;
+	    
+	    if (element * i + startSum < hardCap) {
+        e = element;
+        
+        uint64_t k = 10000000;
+        while (e * i + startSum < hardCap && k > 0) {
+          while (e * i + startSum < hardCap) {
+            e += k;
+          }
+          e -= k;
+          k /= 10;
+        }
+        
+        break;
+	    }
+	    startSum -= element;
+	    
+	    i += 1;
+	  }
+	  
+    uint64_t ii = 0;
+    uint64_t raised = campaignItem->raised.amount;
+    uint64_t newRaised = campaignItem->raised.amount;
+    
+    // contributions_i contributions(_self, campaignId);
+    for (auto& item : contributions) {
+      
+              eosio::print("changing contrib: ");
+              eosio::print(item.quantity.amount);
+              eosio::print("\n");
+      
+      if (item.quantity.amount < e) {
+        continue;
+      }
+      
+	    excessfunds_i excessfunds(_self, campaignId);
+      auto contribution = contributions.find(item.eosAccount.value);
+      uint64_t returnAmount = contribution->quantity.amount - e;
+      
+      excessfunds.emplace(_self, [&](auto& r) {
+        r.attemptedPayment = false;
+        r.isPaid = false;
+        r.eosAccount = contribution->eosAccount;
+        r.quantity = asset(returnAmount, contribution->quantity.symbol);
+      });
+      contributions.modify(contribution, same_payer, [&](auto& r) {
+        r.quantity = asset(e, r.quantity.symbol);
+      });
+      newRaised -= returnAmount;
+	  }
+	  
+    campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+      r.raised = asset(newRaised, r.raised.symbol);
+      r.excessReturned = asset(raised - newRaised, r.raised.symbol);
+      r.status = Status::excessReturning;
+    });
+    
+    // to-do calculate per user % excess
+	  
+	  // schedule payout
+	  _pay(campaignId);
+	  
+	  return true;
+	  
+	} // void _refundHardCap
+
 	uint64_t _verify(name eosAccount, bool kycEnabled) {
 	  if (kycEnabled) {
   	 // accounts_i accounts("scrugeverify"_n, _self.value);
@@ -80,39 +202,7 @@ private:
 		return eosAccount.value;
 		
 	} // void _verify
-
-  void _scheduleRefresh(uint64_t nextRefreshTime) {
-    cancel_deferred("refresh"_n.value);
-    
-    transaction t{};
-    t.actions.emplace_back(permission_level(_self, "active"_n),
-              					   _self, "refresh"_n,
-              					   make_tuple());
-    t.delay_sec = nextRefreshTime;
-    t.send("refresh"_n.value, _self, false);
-  } // void _scheduleRefresh
-  
-  void _scheduleNextPayout(name eosAccount, uint64_t campaignId) {
-    auto now = time_ms();
-    {
-      transaction t{};
-      t.actions.emplace_back(permission_level(_self, "active"_n),
-                					   _self, "send"_n,
-                					   make_tuple( eosAccount, campaignId ));
-      t.delay_sec = 1;
-      t.send(now, _self, false);
-    }
-  
-    {
-      transaction t{};
-      t.actions.emplace_back(permission_level(_self, "active"_n),
-                					   _self, "pay"_n,
-                					   make_tuple( campaignId ));
-      t.delay_sec = 2;
-      t.send(now + 1, _self, false);
-    }
-  } // void _scheduleNextPayout
-
+	
 	void _stopvote(uint64_t campaignId) {
 		campaigns_i campaigns(_self, _self.value);
 		auto campaignItem = campaigns.find(campaignId);
@@ -262,6 +352,7 @@ private:
 		uint64_t backersCount;
 		uint8_t currentMilestone;
 		bool kycEnabled;
+		asset excessReturned;
 
 		uint64_t primary_key() const { return campaignId; }
 	};
@@ -288,6 +379,18 @@ private:
 		uint64_t by_not_attempted_payment() const { return attemptedPayment ? 1 : 0; }
 		uint64_t by_amount_desc() const { return numeric_limits<uint64_t>::max() - quantity.amount; }
 	};
+	
+  TABLE excessfunds {
+    asset quantity;
+    name eosAccount;
+    
+		// refund/token distribution flags
+		bool attemptedPayment;  // did attemt payment
+		bool isPaid;            // payment was successful
+ 
+    uint64_t primary_key() const { return eosAccount.value; }
+		uint64_t by_not_attempted_payment() const { return attemptedPayment ? 1 : 0; }
+  };
 
 	TABLE voting {
 		uint64_t voteId;
@@ -317,6 +420,10 @@ private:
 	typedef multi_index<"milestones"_n, milestones> milestones_i;
 	typedef multi_index<"voters"_n, voters> voters_i;
 	typedef multi_index<"voting"_n, voting> voting_i;
+	
+	typedef multi_index<"excessfunds"_n, excessfunds,
+	    indexed_by<"byap"_n, const_mem_fun<excessfunds, uint64_t, &excessfunds::by_not_attempted_payment>>
+	                        > excessfunds_i;
 
 	typedef multi_index<"contribution"_n, contribution,
 			indexed_by<"byuserid"_n, const_mem_fun<contribution, uint64_t, &contribution::by_userId>>,
