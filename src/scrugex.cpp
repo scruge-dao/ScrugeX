@@ -157,8 +157,8 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 void scrugex::vote(name eosAccount, uint64_t campaignId, bool vote) {
 	require_auth(eosAccount);
 
-	campaigns_i campaigns(_self, _self.value);
-	auto campaignItem = campaigns.find(campaignId);
+  campaigns_i campaigns(_self, _self.value);
+  auto campaignItem = campaigns.find(campaignId);
 	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 
 	eosio_assert(eosAccount != campaignItem->founderEosAccount,

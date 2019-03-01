@@ -104,46 +104,46 @@ private:
 	bool _willRefundExcessiveFunds(uint64_t campaignId) {
 		campaigns_i campaigns(_self, _self.value);
 		auto campaignItem = campaigns.find(campaignId);
-		eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
+    eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 
-  	uint64_t startSum = campaignItem->raised.amount;
-  	uint64_t hardCap = campaignItem->hardCap.amount;
-  	uint64_t softCap = campaignItem->softCap.amount;
+    uint64_t startSum = campaignItem->raised.amount;
+    uint64_t hardCap = campaignItem->hardCap.amount;
+    uint64_t softCap = campaignItem->softCap.amount;
   	
-  	if (startSum < hardCap) { return false; }
+    if (startSum < hardCap) { return false; }
   	
-  	uint64_t backersCount = campaignItem->backersCount;
-  	uint64_t e = 0;
-  	uint64_t i = 0;
+    uint64_t backersCount = campaignItem->backersCount;
+    uint64_t e = 0;
+    uint64_t i = 0;
 	
 		contributions_i contributions(_self, campaignId);
 		auto sortedContributions = contributions.get_index<"byamountdesc"_n>();
 		for (auto& item : sortedContributions) {
 			uint64_t element = item.quantity.amount;
 		
-  		if (element * i + startSum < hardCap) {
-  		e = element;
-  		
-  		uint64_t k = 10000000;
-  		while (e * i + startSum < hardCap && k > 0) {
-  			while (e * i + startSum < hardCap) {
-  			  e += k;
-  			}
-  			e -= k;
-  			k /= 10;
-  		}
-  		break;
-  		}
-  		startSum -= element;
-  		i += 1;
-		}
+      if (element * i + startSum < hardCap) {
+      e = element;
+
+      uint64_t k = 10000000;
+      while (e * i + startSum < hardCap && k > 0) {
+        while (e * i + startSum < hardCap) {
+          e += k;
+        }
+        e -= k;
+        k /= 10;
+      }
+      break;
+      }
+      startSum -= element;
+      i += 1;
+    }
 		
-  	uint64_t ii = 0;
-  	uint64_t raised = campaignItem->raised.amount;
-  	uint64_t newRaised = campaignItem->raised.amount;
+    uint64_t ii = 0;
+    uint64_t raised = campaignItem->raised.amount;
+    uint64_t newRaised = campaignItem->raised.amount;
   	
   	// contributions_i contributions(_self, campaignId);
-  	for (auto& item : contributions) {
+    for (auto& item : contributions) {
 		
   		if (item.quantity.amount < e) {
   		  continue;
@@ -165,13 +165,13 @@ private:
   		newRaised -= returnAmount;
 		}
 		
-  	campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-  		r.raised = asset(newRaised, r.raised.symbol);
-  		r.excessReturned = asset(raised - newRaised, r.raised.symbol);
-  		r.status = Status::excessReturning;
-  	});
+    campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+      r.raised = asset(newRaised, r.raised.symbol);
+      r.excessReturned = asset(raised - newRaised, r.raised.symbol);
+      r.status = Status::excessReturning;
+    });
 	
-	  // to-do calculate per user % excess
+    // to-do calculate per user % excess
 		
 		// schedule payout
 		_pay(campaignId);
@@ -190,7 +190,7 @@ private:
 		//     "this eos account is not associated with scruge account");
 		
 		// return accountItem->id;
-		}
+  }
 
 		return eosAccount.value;
 		
