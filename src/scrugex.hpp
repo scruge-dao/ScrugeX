@@ -290,11 +290,17 @@ private:
 	void _refund(uint64_t campaignId) {
 	campaigns_i campaigns(_self, _self.value);
 	auto campaignItem = campaigns.find(campaignId);
+	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 	
-		campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-			r.status = Status::refunding;
-		});
+	campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+		r.status = Status::refunding;
+	});
 
+  // return tokens to founder 
+  _transfer(campaignItem->founderEosAccount, campaignItem->supplyForSale, 
+      "ScrugeX: Tokens Return", campaignItem->tokenContract);
+  
+  // return money to investors
 	_pay(campaignItem->campaignId);
 	
 	} // void _refund

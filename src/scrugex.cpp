@@ -328,14 +328,16 @@ void scrugex::refresh() {
 				campaignItem.status == Status::distributing ||
 				campaignItem.status == Status::excessReturning) {
 			
+		// to-do DISABLED CAUSES INFINITE LOOP
+			
 			// schedule deferred transaction to refund or ditribute
 			// this should fail if another one is scheduled
 			// to-do make sure it fails or restarts if needed
-			_pay(campaignItem.campaignId);
+		// 	_pay(campaignItem.campaignId);
 			
 			// don't schedule refresh if a campaign is refunding
-			nextRefreshTime = 0;
-			break;
+		// 	nextRefreshTime = 0;
+			continue;
 		}
 
 		// check for ongoing voting
