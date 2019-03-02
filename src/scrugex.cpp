@@ -237,6 +237,19 @@ void scrugex::extend(uint64_t campaignId) {
 	
 } // void scrugex::extend
 
+void scrugex::refund(uint64_t campaignId) {
+  
+	// fetch campaign
+	campaigns_i campaigns(_self, _self.value);
+	auto campaignItem = campaigns.find(campaignId);
+	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
+	auto scope = campaignItem->campaignId;
+	
+	require_auth(campaignItem->founderEosAccount);
+	_refund(campaignItem->campaignId);
+
+} // void scrugex::refund
+
 // to-do refactor
 void scrugex::refresh() {
 	require_auth(_self);
@@ -245,7 +258,7 @@ void scrugex::refresh() {
 	campaigns_i campaigns(_self, _self.value);
 	
 	// refresh again in 5 minutes if nothing else turns up
-	uint64_t nextRefreshTime = 300;
+	uint64_t nextRefreshTime = 3000;
 
 	for (auto& campaignItem: campaigns) {
 
@@ -472,6 +485,13 @@ void scrugex::refresh() {
 } // void scrugex::refresh
 
 
+void scrugex::take(name eosAccount, uint64_t campaignId) {
+  require_auth(eosAccount);
+	_send(eosAccount, campaignId);
+  
+} // void scrugex::take
+
+
 void scrugex::send(name eosAccount, uint64_t campaignId) {
 	require_auth(_self);
 	
@@ -481,13 +501,6 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 	auto scope = campaignItem->campaignId;
 	
-	// this action only works when campaign is automatically refunding
-	// to request failed refund after campaign was closed, there will be another action
-	eosio_assert(campaignItem->status == Status::refunding ||
-							campaignItem->status == Status::distributing ||
-							campaignItem->status == Status::excessReturning, 
-		"this campaign is not paying anyone right now");
-		
 	// if refunding (both not reached soft cap or milestone vote failed)
 	if (campaignItem->status == Status::refunding) {
 		
@@ -532,7 +545,7 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 	}
 	
 	// if returning excess funds (over hard cap)
-	else if (campaignItem->status == Status::excessReturning) {
+	else {
 		
 		// get first in excessfunds
 		excessfunds_i excessfunds(_self, scope);
@@ -547,7 +560,6 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 			 r.attemptedPayment = true;
 			 r.isPaid = true;
 		});
-		
 	}
 	
 } // void scrugex::send
@@ -593,9 +605,9 @@ void scrugex::pay(uint64_t campaignId) {
 		else {
 			
 			// no more payments weren't attempted, the rest can do it manually
-			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-				r.status = Status::closed;
-			});
+		// 	campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+		// 		r.status = Status::closed;
+		// 	});
 			
 			// schedule refresh and exit (to not schedule next payout)
 			_scheduleRefresh(1);
@@ -686,7 +698,7 @@ extern "C" {
 		if (code == receiver) {
 			switch (action) {
 				EOSIO_DISPATCH_HELPER(scrugex,
-						(newcampaign)(vote)(extend)(refresh)(send)(pay) (destroy))
+						(newcampaign)(vote)(extend)(refresh)(send)(pay)(take)(refund) (destroy))
 			}
 		}
 		else if (action == "transfer"_n.value && code != receiver) {

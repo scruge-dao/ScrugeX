@@ -29,12 +29,16 @@ public:
 	ACTION vote(name eosAccount, uint64_t campaignId, bool vote);
 
 	ACTION extend(uint64_t campaignId);
+	
+	ACTION refund(uint64_t campaignId);
 
 	ACTION refresh();
 
 	ACTION destroy();
 
 	ACTION send(name eosAccount, uint64_t campaignId);
+	
+	ACTION take(name eosAccount, uint64_t campaignId);
 
 	ACTION pay(uint64_t campaignId);
 
@@ -57,6 +61,14 @@ private:
 		_transfer(account, quantity, memo, "eosio.token"_n);
 	} // void _transfer
 	
+	void _send(name eosAccount, uint64_t campaignId) {
+	  action(
+			permission_level{ _self, "active"_n },
+			_self, "send"_n,
+			make_tuple(eosAccount, campaignId)
+		).send();
+	} // void _send
+	
 	void _pay(uint64_t campaignId) {
 		action(
 			permission_level{ _self, "active"_n },
@@ -66,38 +78,34 @@ private:
 	} // void _pay
 
 	void _scheduleRefresh(uint64_t nextRefreshTime) {
-	cancel_deferred("refresh"_n.value);
-	
-	transaction t{};
-	t.actions.emplace_back(permission_level(_self, "active"_n),
-									 _self, "refresh"_n,
-									 make_tuple());
-	t.delay_sec = nextRefreshTime;
-	t.send("refresh"_n.value, _self, false);
+  	cancel_deferred("refresh"_n.value);
+  	
+  	transaction t{};
+  	t.actions.emplace_back(permission_level(_self, "active"_n),
+  									 _self, "refresh"_n,
+  									 make_tuple());
+  	t.delay_sec = nextRefreshTime;
+  	t.send("refresh"_n.value, _self, false);
 	} // void _scheduleRefresh
 	
 	void _schedulePay(uint64_t campaignId) {
-	{
 		transaction t{};
 		t.actions.emplace_back(permission_level(_self, "active"_n),
 										 _self, "pay"_n,
 										 make_tuple( campaignId ));
 		t.delay_sec = 2;
 		t.send(time_ms() + 1, _self, false);
-	}
-	
+
 	} //void _schedulePay
 	
 	void _scheduleSend(name eosAccount, uint64_t campaignId) {
-	auto now = time_ms();
-	{
-		transaction t{};
-		t.actions.emplace_back(permission_level(_self, "active"_n),
-										 _self, "send"_n,
-										 make_tuple( eosAccount, campaignId ));
-		t.delay_sec = 1;
-		t.send(time_ms(), _self, false);
-	}
+  	auto now = time_ms();
+  	transaction t{};
+  	t.actions.emplace_back(permission_level(_self, "active"_n),
+  									 _self, "send"_n,
+  									 make_tuple( eosAccount, campaignId ));
+  	t.delay_sec = 1;
+  	t.send(time_ms(), _self, false);
 	
 	} // void _scheduleSend
 	
