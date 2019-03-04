@@ -63,8 +63,6 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
     eosio_assert(max > total, "you can not contribute this much");
     eosio_assert(min < total, "you can not contribute this little");
   
-  	// to-do check campaign cap?
-  
   	// upsert contribution
   	contributions_i contributions(_self, scope);
   	auto contributionItem = contributions.find(eosAccount.value);
@@ -206,8 +204,6 @@ void scrugex::vote(name eosAccount, uint64_t campaignId, bool vote) {
 		votingItem++;
 	}
 
-	// to-do maybe call refresh on this campaign to start a voting?
-
 	eosio_assert(votingItem != voting.end(), "voting is not currently held");
 
 	voters_i voters(_self, scope);
@@ -226,8 +222,6 @@ void scrugex::vote(name eosAccount, uint64_t campaignId, bool vote) {
 		  r.positiveWeight += quantity.amount;
 		}
 	});
-	
-	// to-do check if should maybe end the voting
 	
 } // void scrugex::vote
 
@@ -268,38 +262,32 @@ void scrugex::refresh() {
 
 	for (auto& campaignItem: campaigns) {
 
-		if (now < campaignItem.endTimestamp || 			// still gathering money
-			campaignItem.active == false) {	// over
-			
+		if (now < campaignItem.endTimestamp || campaignItem.active == false) {
 			continue;
 		}
 		
 		// funding is complete
 		if (campaignItem.status == Status::funding) {
-
+			
 			// did not reach soft cap, refund all money
 			if (campaignItem.raised < campaignItem.softCap) {
 			
 				_refund(campaignItem.campaignId);
-				
+
 				// don't schedule refresh if a campaign is refunding
 				nextRefreshTime = 0;
-				break;
 			}
-			
-			if (campaignItem.raised > campaignItem.hardCap) {  
+			else if (campaignItem.raised > campaignItem.hardCap) {  
 				
-				// distribution algorithm
 				if (_willRefundExcessiveFunds(campaignItem.campaignId)) {
-					
 					// payout process is launched
 					nextRefreshTime = 0;
 				}
 				else {
-					
 					// wait for next refresh cycle to continue setup below
 					nextRefreshTime = 1;
 				}
+
 				break;
 			}
 			
@@ -312,19 +300,15 @@ void scrugex::refresh() {
 				r.releasedPercent += campaignItem.initialFundsReleasePercent;
 				r.status = Status::milestone;
 			});
-
-			// complete this transaction and run next one in a second
+			
 			nextRefreshTime = 1;
 			break;
 		}
 		
 		// check if waiting time has passed
 		if (campaignItem.status == Status::waiting && campaignItem.waitingEndTimestamp < now) {
-			
 			// founder failed to act, refunding
 			_refund(campaignItem.campaignId);
-			
-			// don't schedule refresh if a campaign is refunding
 			nextRefreshTime = 0;
 			break;
 		}
@@ -334,13 +318,8 @@ void scrugex::refresh() {
 				campaignItem.status == Status::distributing ||
 				campaignItem.status == Status::excessReturning) {
 			
-  		// 	schedule deferred transaction to refund or ditribute
-  		// 	this should fail if another one is scheduled
-  		// 	to-do make sure it fails or restarts if needed
-			_pay(campaignItem.campaignId);
-			
-			// don't schedule refresh if a campaign is refunding
-		// 	nextRefreshTime = 0;
+			_schedulePay(campaignItem.campaignId);
+			nextRefreshTime = 0;
 			continue;
 		}
 
@@ -359,8 +338,6 @@ void scrugex::refresh() {
 			// check extend deadline votings
 			if (votingItem.milestoneId == milestoneId && votingItem.active &&
 				votingItem.kind == VoteKind::extendDeadline) {
-
-				// to-do check if can close vote earlier
 
 				// extend voting should be over  
 				if (votingItem.endTimestamp < now || votingItem.voters == campaignItem.backersCount) {
@@ -410,8 +387,6 @@ void scrugex::refresh() {
 
 					// vote has just ended, don't start another one
 					shouldStartNextMilestoneVoting = false;
-					
-					// to-do check if can close vote earlier
 					
 					// milestone voting should be over  
 					if (votingItem.endTimestamp < now || votingItem.voters == campaignItem.backersCount) {
@@ -464,10 +439,8 @@ void scrugex::refresh() {
 							// wait for some time for founder to return funds or start extend voting
 							campaigns.modify(campaignItem, same_payer, [&](auto& r) {
 								r.status = Status::waiting;
-								r.waitingEndTimestamp = now + DAY * 7; // to-do USE ACTUAL VALUE
+								r.waitingEndTimestamp = now + WAITING_TIME;
 							});
-							
-							// to-do actual waiting
 						}
 						
 						// complete this transaction and run next one in a second

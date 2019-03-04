@@ -177,19 +177,10 @@ private:
         r.excessReturned = asset(raised - newRaised, r.raised.symbol);
         r.status = Status::excessReturning;
       });
-  	  
     }
-    // distribution algorithm pt. 3
-    else {
-      
-      
-      
-    }
-	  
-    // to-do calculate per user % excess
 		
 		// schedule payout
-		_pay(campaignId);
+		_schedulePay(campaignId);
 		
 		return true;
 		
@@ -215,6 +206,7 @@ private:
 		campaigns_i campaigns(_self, _self.value);
 		auto campaignItem = campaigns.find(campaignId);
 		eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
+		eosio_assert(campaignItem.active, "campaign is no longer active");
 
 		auto scope = campaignItem->campaignId;
 
@@ -241,11 +233,9 @@ private:
 		campaigns_i campaigns(_self, _self.value);
 		auto campaignItem = campaigns.find(campaignId);
 		eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
+		eosio_assert(campaignItem.active, "campaign is no longer active");
 
 		auto scope = campaignItem->campaignId;
-
-		// check if campaign ended & successfully
-		// to-do
 
 		// get current milestone
 		milestones_i milestones(_self, scope);
@@ -260,11 +250,9 @@ private:
 
 		eosio_assert(thisVote == voting.end(), "this voting already exists");
 		
-		// to-do set correct time
 		// check other votes
 		auto now = time_ms();
-		auto start = now;             // 14 days notification 
-		auto end = start + DAY * 14;  // 7 days vote time
+		auto end = now + VOTING_DURATION;
 
 		// delete voters from previous voting
 		voters_i voters(_self, scope);
@@ -275,7 +263,7 @@ private:
 			r.voteId = voteId;
 			r.kind = kind;
 			r.milestoneId = milestoneId;
-			r.startTimestamp = start;
+			r.startTimestamp = now;
 			r.endTimestamp = end;
 			r.voters = 0;
 			r.positiveVotes = 0;
@@ -290,21 +278,21 @@ private:
 	} // void _startvote
 
 	void _refund(uint64_t campaignId) {
-	campaigns_i campaigns(_self, _self.value);
-	auto campaignItem = campaigns.find(campaignId);
-	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
-	
-	campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-		r.status = Status::refunding;
-	});
-
-  // return tokens to founder 
-  _transfer(campaignItem->founderEosAccount, campaignItem->supplyForSale, 
-      "ScrugeX: Tokens Return", campaignItem->tokenContract);
+  	campaigns_i campaigns(_self, _self.value);
+  	auto campaignItem = campaigns.find(campaignId);
+  	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
+  	
+  	campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+  		r.status = Status::refunding;
+  	});
   
-  // return money to investors
-	_pay(campaignItem->campaignId);
-	
+    // return tokens to founder 
+    _transfer(campaignItem->founderEosAccount, campaignItem->supplyForSale, 
+        "ScrugeX: Tokens Return", campaignItem->tokenContract);
+    
+    // return money to investors
+  	_pay(campaignItem->campaignId);
+  	
 	} // void _refund
 
 	void _updateCampaignsCount(uint64_t scope) {

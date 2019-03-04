@@ -21,6 +21,12 @@ const uint64_t T1 = 66;
 // threshold of votes for extending deadline
 const uint64_t T2 = 66; 
 
+// duration to wait for founder input after failed milestone voting
+const uint64_t WAITING_TIME = 7 * DAY;
+
+// duration of voting
+const uint64_t VOTING_DURATION = 7 * DAY;
+
 // todo this should be an argument in extend action
 // and be saved inside a milestone/vote in question
 const uint64_t TIMET = 14 * DAY; 
