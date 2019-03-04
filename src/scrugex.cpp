@@ -219,6 +219,11 @@ void scrugex::vote(name eosAccount, uint64_t campaignId, bool vote) {
 	voting.modify(votingItem, same_payer, [&](auto& r) {
 		r.voters += 1;
 		r.positiveVotes += vote;
+		
+		r.votedWeight += quantity.amount;
+		if (vote) {
+		  r.positiveWeight += quantity.amount;
+		}
 	});
 	
 	// to-do check if should maybe end the voting
@@ -365,7 +370,7 @@ void scrugex::refresh() {
 					_stopvote(campaignItem.campaignId);
 
 					// calculate decision
-					if (votingItem.positiveVotes >= get_percent(votingItem.voters, T1)) {
+					if (votingItem.positiveWeight >= get_percent(votingItem.votedWeight, T1)) {
 
 						// to-do test and complete
 
@@ -416,7 +421,7 @@ void scrugex::refresh() {
 						_stopvote(campaignItem.campaignId);
 						
 						// calculate decision
-						if (votingItem.positiveVotes >= get_percent(votingItem.voters, T1)) {
+						if (votingItem.positiveWeight >= get_percent(votingItem.votedWeight, T1)) {
 							
 							// milestone vote success
 							

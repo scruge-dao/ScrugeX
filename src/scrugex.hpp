@@ -280,6 +280,8 @@ private:
 			r.voters = 0;
 			r.positiveVotes = 0;
 			r.active = true;
+			r.votedWeight = 0;
+			r.positiveWeight = 0;
 		});
 
 		campaigns.modify(campaignItem, _self, [&](auto& r) {
@@ -418,8 +420,12 @@ private:
 		uint64_t voteId;
 		uint8_t kind;   // VoteKind
 		uint8_t milestoneId;
-		int64_t voters;
-		int64_t positiveVotes;
+		uint64_t voters;
+		uint64_t positiveVotes;
+		
+		uint64_t votedWeight;
+		uint64_t positiveWeight;
+		
 		uint64_t endTimestamp;
 		uint64_t startTimestamp;
 		bool active;
