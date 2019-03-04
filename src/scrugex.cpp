@@ -143,6 +143,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 		r.tokenContract = tokenContract;
 		r.tokensReceived = false;
 		r.waitingEndTimestamp = 0;
+		r.active = true;
 	});
 
 	int scope = _getCampaignsCount();
@@ -268,7 +269,7 @@ void scrugex::refresh() {
 	for (auto& campaignItem: campaigns) {
 
 		if (now < campaignItem.endTimestamp || 			// still gathering money
-			campaignItem.status == Status::closed) {	// over
+			campaignItem.active == false) {	// over
 			
 			continue;
 		}
@@ -333,12 +334,10 @@ void scrugex::refresh() {
 				campaignItem.status == Status::distributing ||
 				campaignItem.status == Status::excessReturning) {
 			
-		// to-do DISABLED CAUSES INFINITE LOOP
-			
-			// schedule deferred transaction to refund or ditribute
-			// this should fail if another one is scheduled
-			// to-do make sure it fails or restarts if needed
-		// 	_pay(campaignItem.campaignId);
+  		// 	schedule deferred transaction to refund or ditribute
+  		// 	this should fail if another one is scheduled
+  		// 	to-do make sure it fails or restarts if needed
+			_pay(campaignItem.campaignId);
 			
 			// don't schedule refresh if a campaign is refunding
 		// 	nextRefreshTime = 0;
@@ -612,9 +611,9 @@ void scrugex::pay(uint64_t campaignId) {
 		else {
 			
 			// no more payments weren't attempted, the rest can do it manually
-		// 	campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-		// 		r.status = Status::closed;
-		// 	});
+			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+				r.active = false;
+			});
 			
 			// schedule refresh and exit (to not schedule next payout)
 			_scheduleRefresh(1);
@@ -649,6 +648,7 @@ void scrugex::pay(uint64_t campaignId) {
 			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
 				r.status = Status::funding;
 			});
+			
 			_scheduleRefresh(1);
 		}
 	}
