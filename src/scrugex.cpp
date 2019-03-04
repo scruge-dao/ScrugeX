@@ -495,7 +495,7 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
     if (campaignItem->status == Status::refunding) {
 		  uint64_t refundPercent = 100 - campaignItem->releasedPercent;
 	    paymentAmount	= get_percent(contributionItem->quantity.amount, refundPercent);
-	    _transfer(eosAccount, asset(amount, EOS_SYMBOL), "ScrugeX: Refund for campaign");
+	    _transfer(eosAccount, asset(paymentAmount, EOS_SYMBOL), "ScrugeX: Refund for campaign");
     }
     
     // if campaign is over and tokens are being distributed to backers
@@ -617,6 +617,18 @@ void scrugex::pay(uint64_t campaignId) {
 } // void scrugex::startrefund
 
 
+// exchange
+
+void scrugex::buy(name eosAccount, asset quantity) {
+  
+  
+} // void scrugex::buy
+
+void scrugex::sell(name eosAccount, asset quantity) {
+  
+  
+} // void scrugex::sell
+
 // debug
 
 
@@ -666,7 +678,9 @@ extern "C" {
 		if (code == receiver) {
 			switch (action) {
 				EOSIO_DISPATCH_HELPER(scrugex,
-						(newcampaign)(vote)(extend)(refresh)(send)(pay)(take)(refund) (destroy))
+						(newcampaign)(vote)(extend)(refresh)(send)(pay)(take)(refund)
+            (buy)(sell) 
+						(destroy))
 			}
 		}
 		else if (action == "transfer"_n.value && code != receiver) {

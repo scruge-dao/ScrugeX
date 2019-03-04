@@ -41,6 +41,12 @@ public:
 	ACTION take(name eosAccount, uint64_t campaignId);
 
 	ACTION pay(uint64_t campaignId);
+	
+	// exchange 
+	
+	ACTION buy(name eosAccount, asset quantity);
+	
+	ACTION sell(name eosAccount, asset quantity);
 
 private:
 
@@ -206,7 +212,7 @@ private:
 		campaigns_i campaigns(_self, _self.value);
 		auto campaignItem = campaigns.find(campaignId);
 		eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
-		eosio_assert(campaignItem.active, "campaign is no longer active");
+		eosio_assert(campaignItem->active, "campaign is no longer active");
 
 		auto scope = campaignItem->campaignId;
 
@@ -233,7 +239,7 @@ private:
 		campaigns_i campaigns(_self, _self.value);
 		auto campaignItem = campaigns.find(campaignId);
 		eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
-		eosio_assert(campaignItem.active, "campaign is no longer active");
+		eosio_assert(campaignItem->active, "campaign is no longer active");
 
 		auto scope = campaignItem->campaignId;
 
@@ -366,6 +372,11 @@ private:
 		uint8_t currentMilestone;
 		bool kycEnabled;
 		bool active;
+		
+		// exchange
+		uint64_t exchangeRoundPrice;
+		uint64_t exchangeRoundVolume;
+		asset exchangeInvestorFund;
 
 		uint64_t primary_key() const { return campaignId; }
 	};
@@ -429,6 +440,18 @@ private:
 
 		uint64_t primary_key() const { return userId; }
 	};
+	
+  TABLE sellorders {
+    name eosAccount;
+    asset quantity;
+    uint64_t timestamp;
+  };
+
+  TABLE buyorders {
+    name eosAccount;
+    asset quantity;
+    uint64_t timestamp;
+  };
 
 	// tables
 
