@@ -317,7 +317,7 @@ void scrugex::refresh() {
 		if (campaignItem.status == Status::refunding || 
 				campaignItem.status == Status::distributing ||
 				campaignItem.status == Status::excessReturning) {
-			
+
 			_schedulePay(campaignItem.campaignId);
 			nextRefreshTime = 0;
 			continue;
@@ -481,7 +481,7 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 	auto scope = campaignItem->campaignId;
 	
 	// if refunding (both not reached soft cap or milestone vote failed)
-	if (campaignItem->status == Status::refunding) {
+	if (campaignItem->status == Status::refunding || campaignItem->status == Status::distributing) {
 		
 		// get contribution
 		contributions_i contributions(_self, scope);
@@ -489,34 +489,23 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 		
 		eosio_assert(contributionItem->isPaid == false, "this user has already been paid");
 			
-		uint64_t refundPercent = 100 - campaignItem->releasedPercent;
-		uint64_t amount = get_percent(contributionItem->quantity.amount, refundPercent);
+		uint64_t paymentAmount;
 		
-		_transfer(eosAccount, asset(amount, EOS_SYMBOL), "ScrugeX: Refund for campaign");
+		// if refunding (both not reached soft cap or milestone vote failed)
+    if (campaignItem->status == Status::refunding) {
+		  uint64_t refundPercent = 100 - campaignItem->releasedPercent;
+	    paymentAmount	= get_percent(contributionItem->quantity.amount, refundPercent);
+	    _transfer(eosAccount, asset(amount, EOS_SYMBOL), "ScrugeX: Refund for campaign");
+    }
+    
+    // if campaign is over and tokens are being distributed to backers
+    else {
+    	paymentAmount = campaignItem->supplyForSale.amount *
+	          contributionItem->quantity.amount / campaignItem->raised.amount; // to-do CHECK FOR OVERFLOW
+  		auto paymentQuantity = asset(paymentAmount, campaignItem->supplyForSale.symbol);
+  		_transfer(eosAccount, paymentQuantity, "ScrugeX: Tokens Distribution", campaignItem->tokenContract);
+    }
 		
-		// set is paid 
-		contributions.modify(contributionItem, same_payer, [&](auto& r) {
-			 r.attemptedPayment = true;
-			 r.isPaid = true;
-		});
-	}
-	
-	// if campaign is over and tokens are distributing to backers
-	else if (campaignItem->status == Status::distributing) {
-		
-		// get contribution
-		contributions_i contributions(_self, scope);
-		auto contributionItem = contributions.find(eosAccount.value);
-		
-		eosio_assert(contributionItem->isPaid == false, "this user has already been paid");
-		
-		uint64_t paymentAmount = campaignItem->supplyForSale.amount *
-		          contributionItem->quantity.amount / campaignItem->raised.amount; // to-do CHECK FOR OVERFLOW
-
-		auto paymentQuantity = asset(paymentAmount, campaignItem->supplyForSale.symbol);
-		_transfer(eosAccount, paymentQuantity, "ScrugeX: Tokens Distribution", campaignItem->tokenContract);
-		
-		// set is paid 
 		contributions.modify(contributionItem, same_payer, [&](auto& r) {
 			 r.attemptedPayment = true;
 			 r.isPaid = true;
@@ -534,7 +523,6 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 
 		_transfer(eosAccount, excessfundsItem->quantity, "ScrugeX: Excessive Funding Return");
 		
-		// set is paid 
 		excessfunds.modify(excessfundsItem, same_payer, [&](auto& r) {
 			 r.attemptedPayment = true;
 			 r.isPaid = true;
