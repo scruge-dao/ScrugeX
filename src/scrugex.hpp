@@ -158,6 +158,7 @@ private:
       uint64_t raised = campaignItem->raised.amount;
       uint64_t newRaised = campaignItem->raised.amount;
     	
+    	// to-do loop sorted contributions again and break after dealing with all
       for (auto& item : contributions) {
     		if (item.quantity.amount < e) {
           continue;
@@ -441,7 +442,6 @@ private:
 		asset previousPrice;
 		asset roundPrice;
 		asset roundSellVolume;
-		asset roundBuyVolume;
 		asset investorsFund;
 		uint64_t priceTimestamp;
 		uint64_t sellEndTimestamp;
@@ -462,14 +462,20 @@ private:
   };
 
   TABLE buyorders {
-    bool isPaid;
+    bool paymentReceived;
     name eosAccount;
     asset quantity;
     asset sum;
-    uint64_t price;
+    asset price;
     uint64_t timestamp;
     
+		// distribution flags
+		bool attemptedPayment;  // did attemt payment
+		bool isPaid;            // payment was successful
+ 
     uint64_t primary_key() const { return eosAccount.value; }
+    // to-do secondary sort by timestamp
+    uint64_t by_price() const { return numeric_limits<uint64_t>::max() - price.amount; } 
   };
 
 	// tables
@@ -494,7 +500,10 @@ private:
 	
   typedef multi_index<"exchangeinfo"_n, exchangeinfo> exchangeinfo_i;
   typedef multi_index<"sellorders"_n, sellorders> sellorders_i;
-  typedef multi_index<"buyorders"_n, buyorders> buyorders_i;
+  
+  typedef multi_index<"buyorders"_n, buyorders,
+    indexed_by<"bypricedesc"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_price>>
+      > buyorders_i;
 
 	// to access kyc/aml table
 	

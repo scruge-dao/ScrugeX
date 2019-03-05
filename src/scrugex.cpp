@@ -108,10 +108,6 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
       eosio_assert(exchangeItem != exchangeinfo.end(), "exchange does not exist");
       eosio_assert(exchangeItem->status == ExchangeStatus::buying, "campaign is not running");
       
-      exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
-        r.roundBuyVolume += quantity;
-      });
-      
       buyorders_i buyorders(_self, campaignId);
       auto buyOrderItem = buyorders.find(eosAccount.value);
       eosio_assert(buyOrderItem != buyorders.end(), "to use exchange, create an order first with [buy] action");
@@ -119,7 +115,7 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
       eosio_assert(buyOrderItem->sum == quantity, "you have to pay the exact sum you specified in your order");
       
       buyorders.modify(buyOrderItem, same_payer, [&](auto& r) {
-        r.isPaid = true;
+        r.paymentReceived = true;
         r.timestamp = time_ms();
       });
     }
@@ -184,7 +180,6 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 		r.previousPrice = asset(0, investmentSymbol);
 		r.roundPrice = asset(0, investmentSymbol);
 		r.roundSellVolume = asset(0, supplyForSale.symbol);
-		r.roundBuyVolume = asset(0, supplyForSale.symbol);
 		r.investorsFund = asset(0, investmentSymbol);
 		r.sellEndTimestamp = 0;
 		r.priceTimestamp = 0;
@@ -408,6 +403,40 @@ void scrugex::refresh() {
         
         // check if can close deals
         
+        bool canClose = false;
+        
+        // check if should close because of price
+        
+        // go through buy orders with highest price higher than pAU
+        buyorders_i buyorders(_self, campaignItem.campaignId);
+        auto ordersByPrice = buyorders.get_index<"bypricedesc"_n>();
+        
+        auto buyVolume = asset(0, exchangeItem->roundSellVolume.symbol);
+        for (auto& orderItem : ordersByPrice) {
+          buyVolume += orderItem.quantity;
+          
+          if (buyVolume > exchangeItem->roundSellVolume) {
+            canClose = true;
+            break;
+          }
+        }
+        
+  
+        
+        // close deals
+        if (canClose) {
+          
+          // loop buy orders and complete them
+          
+          // mark remaining buy orders for refund
+          
+          // start payment process
+          
+          // close exchange
+          exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
+            r.status = ExchangeStatus::disabled;
+          });
+        }
         
         break;
       }
@@ -532,7 +561,6 @@ void scrugex::refresh() {
                   r.previousPrice = r.roundPrice * EXCHANGE_PRICE_MULTIPLIER;
                   r.roundPrice = asset(0, r.roundPrice.symbol);
                   r.roundSellVolume = asset(0, r.roundSellVolume.symbol);
-                  r.roundBuyVolume = asset(0, r.roundBuyVolume.symbol);
                 });
   
 							}
@@ -735,13 +763,15 @@ void scrugex::pay(uint64_t campaignId) {
 void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity, asset sum) {
   require_auth(eosAccount);
   
+  // to-do check if backers, or what?
+  
   exchangeinfo_i exchangeinfo(_self, campaignId);
   auto exchangeItem = exchangeinfo.begin();
   eosio_assert(exchangeItem != exchangeinfo.end(), "exchange does not exist");
   eosio_assert(exchangeItem->status == ExchangeStatus::buying, "exchange doesn't take buy orders right now");
   
   eosio_assert(quantity.symbol.is_valid(), "invalid quantity");
-  eosio_assert(quantity.symbol == exchangeItem->roundBuyVolume.symbol, "incorrect quantity symbol");
+  eosio_assert(quantity.symbol == exchangeItem->roundSellVolume.symbol, "incorrect quantity symbol");
   
   eosio_assert(sum.symbol.is_valid(), "invalid price");
   eosio_assert(sum.symbol == exchangeItem->investorsFund.symbol, "incorrect price symbol");
@@ -754,8 +784,10 @@ void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity, asset su
     r.eosAccount = eosAccount;
     r.quantity = quantity;
     r.sum = sum;
-    r.price = price;
+    r.price = asset(price, sum.symbol);
+    r.attemptedPayment = false;
     r.isPaid = false;
+    r.paymentReceived = false;
     r.timestamp = time_ms();
   });
   
@@ -764,6 +796,8 @@ void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity, asset su
 
 void scrugex::sell(name eosAccount, uint64_t campaignId, asset quantity) {
   require_auth(eosAccount);
+  
+  // to-do check if backer
   
   exchangeinfo_i exchangeinfo(_self, campaignId);
   auto exchangeItem = exchangeinfo.begin();
@@ -783,7 +817,7 @@ void scrugex::sell(name eosAccount, uint64_t campaignId, asset quantity) {
   sellorders.emplace(eosAccount, [&](auto& r) {
     r.eosAccount = eosAccount;
     r.quantity = quantity;
-    r.timestamp = 0;
+    r.timestamp = time_ms();
     r.attemptedPayment = false;
     r.isPaid = false;
   });

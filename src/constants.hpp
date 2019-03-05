@@ -16,10 +16,10 @@ const uint64_t T1 = 66;
 const uint64_t T2 = 66; 
 
 // duration to wait for founder input after failed milestone voting
-const uint64_t WAITING_TIME = 7 * DAY;
+const uint64_t WAITING_TIME = 3 * DAY;
 
 // duration of voting
-const uint64_t VOTING_DURATION = 7 * DAY;
+const uint64_t VOTING_DURATION = 7 * DAY; // to-do change to percentage
 
 // sell window after voting
 const uint64_t EXCHANGE_SELL_DURATION = 3 * DAY;
