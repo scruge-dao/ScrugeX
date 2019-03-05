@@ -42,16 +42,18 @@ public:
 
 	ACTION pay(uint64_t campaignId);
 	
-	// exchange 
+	// exchange
 	
-	ACTION buy(name eosAccount, asset quantity);
+	ACTION buy(name eosAccount, uint64_t campaignId, asset quantity);
 	
-	ACTION sell(name eosAccount, asset quantity);
+	ACTION sell(name eosAccount, uint64_t campaignId, asset quantity);
 
 private:
 
 	enum Status: uint8_t { funding = 0, milestone = 1, activeVote = 2, waiting = 3,
 							 refunding = 4, distributing = 5, excessReturning = 6 };
+	
+	enum ExchangeStatus: uint8_t { disabled = 0, selling = 1, buying = 2 };
 	
 	enum VoteKind: uint8_t { extendDeadline = 0, milestoneResult = 1 };
 
@@ -229,7 +231,7 @@ private:
 		}
 		eosio_assert(votingItem != voting.end(), "voting is not currently held");
 
-		voting.modify(votingItem, _self, [&](auto& r) {
+		voting.modify(votingItem, same_payer, [&](auto& r) {
 			r.active = false;
 		});
 		
@@ -278,7 +280,7 @@ private:
 			r.positiveWeight = 0;
 		});
 
-		campaigns.modify(campaignItem, _self, [&](auto& r) {
+		campaigns.modify(campaignItem, same_payer, [&](auto& r) {
 			r.status = Status::activeVote;
 		});
 	} // void _startvote
@@ -311,7 +313,7 @@ private:
 		if (information.begin() == information.end()) {
 			information.emplace(_self, lambda);
 		}
-		else { information.modify(information.begin(), _self, lambda); }
+		else { information.modify(information.begin(), same_payer, lambda); }
 		
 	} // void _updateCampaignsCount
 
@@ -323,11 +325,10 @@ private:
 		return 0;
 	} // uint64_t _getCampaignsCount
 
+  // to-do optimize
 	asset _getContributionQuantity(int64_t scope, uint64_t userId) {
-		asset total = asset(0, EOS_SYMBOL);
-		eosio_assert(scope >= 0, "campaign does not exist");
-
 		contributions_i contributions(_self, scope);
+		asset total = asset(0, EOS_SYMBOL); // use investment symbol
 		for (auto& item : contributions) {
 			if (item.userId == userId) {
 				 total += item.quantity;
@@ -373,11 +374,6 @@ private:
 		bool kycEnabled;
 		bool active;
 		
-		// exchange
-		uint64_t exchangeRoundPrice;
-		uint64_t exchangeRoundVolume;
-		asset exchangeInvestorFund;
-
 		uint64_t primary_key() const { return campaignId; }
 	};
 
@@ -441,16 +437,32 @@ private:
 		uint64_t primary_key() const { return userId; }
 	};
 	
+	TABLE exchangeinfo {
+		uint8_t status;
+		asset previousPrice;
+		asset roundPrice;
+		asset roundSellVolume;
+		asset roundBuyVolume;
+		asset investorsFund;
+		uint64_t endTimestamp;
+		
+		uint64_t primary_key() const { return 0; }
+	};
+	
   TABLE sellorders {
     name eosAccount;
     asset quantity;
     uint64_t timestamp;
+    
+    uint64_t primary_key() const { return eosAccount.value; }
   };
 
   TABLE buyorders {
     name eosAccount;
     asset quantity;
     uint64_t timestamp;
+    
+    uint64_t primary_key() const { return eosAccount.value; }
   };
 
 	// tables
@@ -463,14 +475,20 @@ private:
 	
 	typedef multi_index<"excessfunds"_n, excessfunds,
 		indexed_by<"byap"_n, const_mem_fun<excessfunds, uint64_t, &excessfunds::by_not_attempted_payment>>
-							            > excessfunds_i;
+			> excessfunds_i;
 
 	typedef multi_index<"contribution"_n, contribution,
-			indexed_by<"byuserid"_n, const_mem_fun<contribution, uint64_t, &contribution::by_userId>>,
-			indexed_by<"byap"_n, const_mem_fun<contribution, uint64_t, &contribution::by_not_attempted_payment>>,
-			indexed_by<"byamountdesc"_n, const_mem_fun<contribution, uint64_t, &contribution::by_amount_desc>>
-													 > contributions_i;
+		indexed_by<"byuserid"_n, const_mem_fun<contribution, uint64_t, &contribution::by_userId>>,
+		indexed_by<"byap"_n, const_mem_fun<contribution, uint64_t, &contribution::by_not_attempted_payment>>,
+		indexed_by<"byamountdesc"_n, const_mem_fun<contribution, uint64_t, &contribution::by_amount_desc>>
+			> contributions_i;
 	
+	// exchange
+	
+  typedef multi_index<"exchangeinfo"_n, exchangeinfo> exchangeinfo_i;
+  typedef multi_index<"sellorders"_n, sellorders> sellorders_i;
+  typedef multi_index<"buyorders"_n, buyorders> buyorders_i;
+
 	// to access kyc/aml table
 	
 	struct account {

@@ -27,6 +27,12 @@ const uint64_t WAITING_TIME = 7 * DAY;
 // duration of voting
 const uint64_t VOTING_DURATION = 7 * DAY;
 
+// sell window after voting
+const uint64_t EXCHANGE_SELL_DURATION = 7 * DAY;
+
+// default refresh period 
+const uint64_t REFRESH_PERIOD = 5 * MINUTE;
+
 // todo this should be an argument in extend action
 // and be saved inside a milestone/vote in question
 const uint64_t TIMET = 14 * DAY; 
