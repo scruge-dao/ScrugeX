@@ -52,7 +52,7 @@ private:
 	enum Status: uint8_t { funding = 0, milestone = 1, activeVote = 2, waiting = 3,
 							 refunding = 4, distributing = 5, excessReturning = 6 };
 	
-	enum ExchangeStatus: uint8_t { disabled = 0, selling = 1, buying = 2 };
+	enum ExchangeStatus: uint8_t { inactive = 0, selling = 1, buying = 2 };
 	
 	enum VoteKind: uint8_t { extendDeadline = 0, milestoneResult = 1 };
 
@@ -450,6 +450,7 @@ private:
 	};
 	
   TABLE sellorders {
+    // to-do link with milestones to claim remaining eos from multiple exchange runs 
     name eosAccount;
     asset quantity;
     uint64_t timestamp;
@@ -462,18 +463,21 @@ private:
   };
 
   TABLE buyorders {
+    uint64_t key;
+    // to-do link with milestones to claim remaining eos from multiple exchange runs 
     bool paymentReceived;
     name eosAccount;
     asset quantity;
     asset sum;
     asset price;
     uint64_t timestamp;
+    asset spent;
     
 		// distribution flags
 		bool attemptedPayment;  // did attemt payment
 		bool isPaid;            // payment was successful
  
-    uint64_t primary_key() const { return eosAccount.value; }
+    uint64_t primary_key() const { return key; }
     // to-do secondary sort by timestamp
     uint64_t by_price() const { return numeric_limits<uint64_t>::max() - price.amount; } 
   };

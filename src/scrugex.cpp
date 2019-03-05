@@ -176,7 +176,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	
   exchangeinfo_i exchangeinfo(_self, campaignId);
   exchangeinfo.emplace(_self, [&](auto& r) {
-    r.status = ExchangeStatus::disabled;
+    r.status = ExchangeStatus::inactive;
 		r.previousPrice = asset(0, investmentSymbol);
 		r.roundPrice = asset(0, investmentSymbol);
 		r.roundSellVolume = asset(0, supplyForSale.symbol);
@@ -373,7 +373,7 @@ void scrugex::refresh() {
     exchangeinfo_i exchangeinfo(_self, campaignItem.campaignId);
     auto exchangeItem = exchangeinfo.begin();
     
-    if (exchangeItem->status != ExchangeStatus::disabled) {
+    if (exchangeItem->status != ExchangeStatus::inactive) {
       
       // exchange sell period is over 
       if (exchangeItem->status == ExchangeStatus::buying && exchangeItem->sellEndTimestamp > now) {
@@ -382,7 +382,7 @@ void scrugex::refresh() {
       
         //close exchange if no orders exist
         auto newStatus = sellorders.begin() == sellorders.end() ? 
-            ExchangeStatus::disabled : ExchangeStatus::buying;
+            ExchangeStatus::inactive : ExchangeStatus::buying;
         
         exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
           r.status = newStatus;
@@ -401,40 +401,45 @@ void scrugex::refresh() {
           });
         }
         
-        // check if can close deals
         
-        bool canClose = false;
+        // check if should close because of price threshold
         
-        // check if should close because of price
+        bool volumeSurpassed = false;
         
-        // go through buy orders with highest price higher than pAU
         buyorders_i buyorders(_self, campaignItem.campaignId);
         auto ordersByPrice = buyorders.get_index<"bypricedesc"_n>();
         
         auto buyVolume = asset(0, exchangeItem->roundSellVolume.symbol);
+        
         for (auto& orderItem : ordersByPrice) {
           buyVolume += orderItem.quantity;
           
+          // calculate purchase percent
+          
           if (buyVolume > exchangeItem->roundSellVolume) {
-            canClose = true;
+            volumeSurpassed = true;
+            
+            auto item = buyorders.find(orderItem.key);
+            buyorders.modify(item, same_payer, [&](auto& r) {
+              r.spent = buyVolume - exchangeItem->roundSellVolume;
+            });
+            
             break;
+          }
+          else {
+            auto item = buyorders.find(orderItem.key);
+            buyorders.modify(item, same_payer, [&](auto& r) {
+              r.spent = r.sum;
+            });
           }
         }
         
-  
-        
         // close deals
-        if (canClose) {
-          
-          // loop buy orders and complete them
-          
-          // mark remaining buy orders for refund
-          
-          // start payment process
+        if (volumeSurpassed) {
           
           // close exchange
           exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
-            r.status = ExchangeStatus::disabled;
+            r.status = ExchangeStatus::inactive;
           });
         }
         
@@ -781,6 +786,7 @@ void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity, asset su
   
   buyorders_i buyorders(_self, campaignId);
   buyorders.emplace(eosAccount, [&](auto& r) {
+    r.key = buyorders.available_primary_key();
     r.eosAccount = eosAccount;
     r.quantity = quantity;
     r.sum = sum;
@@ -789,6 +795,7 @@ void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity, asset su
     r.isPaid = false;
     r.paymentReceived = false;
     r.timestamp = time_ms();
+    r.spent = asset(0, sum.symbol);
   });
   
 } // void scrugex::buy
