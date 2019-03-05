@@ -321,6 +321,7 @@ void scrugex::refresh() {
 
 				// don't schedule refresh if a campaign is refunding
 				nextRefreshTime = 0;
+				break;
 			}
 			else if (campaignItem.raised > campaignItem.hardCap) {  
 				
@@ -376,7 +377,7 @@ void scrugex::refresh() {
     if (exchangeItem->status != ExchangeStatus::inactive) {
       
       // exchange sell period is over 
-      if (exchangeItem->status == ExchangeStatus::buying && exchangeItem->sellEndTimestamp > now) {
+      if (exchangeItem->status == ExchangeStatus::selling && exchangeItem->sellEndTimestamp < now) {
       
         sellorders_i sellorders(_self, campaignItem.campaignId);
       
@@ -391,7 +392,7 @@ void scrugex::refresh() {
         break;
       }
       
-      if (exchangeItem->status == ExchangeStatus::selling) {
+      if (exchangeItem->status == ExchangeStatus::buying) {
         
         // lower auction price when needed
         if (exchangeItem->priceTimestamp + EXCHANGE_PRICE_PERIOD > now) {
@@ -400,7 +401,6 @@ void scrugex::refresh() {
             r.roundPrice /= 2;
           });
         }
-        
         
         // check if should close because of price threshold
         
@@ -559,15 +559,19 @@ void scrugex::refresh() {
 								exchangeinfo_i exchangeinfo(_self, campaignItem.campaignId);
 								auto exchangeItem = exchangeinfo.begin();
 								
+								auto newPrice = exchangeItem->roundPrice.amount;
+								if (newPrice == 0) {
+								  newPrice = campaignItem.supplyForSale.amount / campaignItem.raised.amount;
+								}
+								
                 exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
                   r.status = ExchangeStatus::selling;
-                  r.sellEndTimestamp = time_ms() + EXCHANGE_SELL_DURATION;
-                  r.priceTimestamp = time_ms();
+                  r.sellEndTimestamp = now + EXCHANGE_SELL_DURATION;
+                  r.priceTimestamp = now;
                   r.previousPrice = r.roundPrice * EXCHANGE_PRICE_MULTIPLIER;
-                  r.roundPrice = asset(0, r.roundPrice.symbol);
+                  r.roundPrice = asset(newPrice, r.roundPrice.symbol);
                   r.roundSellVolume = asset(0, r.roundSellVolume.symbol);
                 });
-  
 							}
 						}
 						else {
@@ -781,7 +785,9 @@ void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity, asset su
   eosio_assert(sum.symbol.is_valid(), "invalid price");
   eosio_assert(sum.symbol == exchangeItem->investorsFund.symbol, "incorrect price symbol");
   
+  // to-do calculate eos/token instead? or some other way to store price
   auto price = sum.amount / quantity.amount;
+  
   eosio_assert(price > 0, "token price calculated with arguments passed is too low");
   
   buyorders_i buyorders(_self, campaignId);
