@@ -1,7 +1,5 @@
 #include "scrugex.hpp"
 
-using namespace eosio;
-using namespace std;
 
 void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	if (to != _self) { return; }
@@ -37,7 +35,6 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
     campaigns.modify(campaignItem, same_payer, [&](auto& r) {
       r.tokensReceived = true;
     });
-    
 	} 
 	
 	// backer is investing
@@ -45,59 +42,87 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
     
     // check token contract
     eosio_assert(code == "eosio.token"_n, "you have to use the system EOS token");
-	
-    // get userId from kyc or eosAccount
-    uint64_t userId = _verify(eosAccount, campaignItem->kycEnabled);
-  	
+    
     eosio_assert(time > campaignItem->startTimestamp, "campaign has not started yet");
-    eosio_assert(time < campaignItem->endTimestamp, "campaign has ended");
-    eosio_assert(campaignItem->status == Status::funding, "campaign is not running");
-    eosio_assert(campaignItem->tokensReceived == true, "campaign has not been supplied with tokens to sale");
-  
-  	// check if allowed to invest this amount
-    asset previous = _getContributionQuantity(scope, userId);
-    asset total = previous + quantity;
-  	
-    asset max = get_percent(campaignItem->hardCap, campaignItem->maxUserContributionPercent);
-    asset min = get_percent(campaignItem->hardCap, campaignItem->minUserContributionPercent);
-    eosio_assert(max > total, "you can not contribute this much");
-    eosio_assert(min < total, "you can not contribute this little");
-  
-  	// upsert contribution
-  	contributions_i contributions(_self, scope);
-  	auto contributionItem = contributions.find(eosAccount.value);
-  
-  	// upsert
-  	if (contributionItem != contributions.end()) {
-  		auto inUse = contributionItem->userId == userId;
-  		eosio_assert(inUse, "this eos account was used to contrubute by another scruge user");
-  
-  		contributions.modify(contributionItem, same_payer, [&](auto& r) {
-  			r.quantity += quantity;
-  		});
-  	}
-  	else {
-  		// advance backers
-  		if (previous.amount == 0) {
-  			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-  				r.backersCount += 1;
-  			});
-  		}
-  
-  		contributions.emplace(_self, [&](auto& r) {
-  			r.userId = userId;
-  			r.eosAccount = eosAccount;
-  			r.quantity = quantity;
-  			
-  			r.attemptedPayment = false;
-  			r.isPaid = false;
-  		});
-  	}
-  
-  	// update raised in campaigns
-  	campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-  		r.raised += quantity;
-  	});
+    
+    if (time < campaignItem->endTimestamp) {
+      // primary investment 
+      
+      eosio_assert(time < campaignItem->endTimestamp, "campaign has ended");
+      eosio_assert(campaignItem->status == Status::funding, "campaign is not running");
+      eosio_assert(campaignItem->tokensReceived == true, "campaign has not been supplied with tokens to sale");
+    
+      // get userId from kyc or eosAccount
+      uint64_t userId = _verify(eosAccount, campaignItem->kycEnabled);
+    	
+    	// check if allowed to invest this amount
+      asset previous = _getContributionQuantity(scope, userId);
+      asset total = previous + quantity;
+    	
+      asset max = get_percent(campaignItem->hardCap, campaignItem->maxUserContributionPercent);
+      asset min = get_percent(campaignItem->hardCap, campaignItem->minUserContributionPercent);
+      eosio_assert(max > total, "you can not contribute this much");
+      eosio_assert(min < total, "you can not contribute this little");
+    
+    	// upsert contribution
+    	contributions_i contributions(_self, scope);
+    	auto contributionItem = contributions.find(eosAccount.value);
+    
+    	// upsert
+    	if (contributionItem != contributions.end()) {
+    		auto inUse = contributionItem->userId == userId;
+    		eosio_assert(inUse, "this eos account was used to contrubute by another scruge user");
+    
+    		contributions.modify(contributionItem, same_payer, [&](auto& r) {
+    			r.quantity += quantity;
+    		});
+    	}
+    	else {
+    		// advance backers
+    		if (previous.amount == 0) {
+    			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+    				r.backersCount += 1;
+    			});
+    		}
+    
+    		contributions.emplace(_self, [&](auto& r) {
+    			r.userId = userId;
+    			r.eosAccount = eosAccount;
+    			r.quantity = quantity;
+    			
+    			r.attemptedPayment = false;
+    			r.isPaid = false;
+    		});
+    	}
+    
+    	// update raised in campaigns
+    	campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+    		r.raised += quantity;
+    	});
+    }
+    else {
+      // paying for exchange buy order
+      
+      exchangeinfo_i exchangeinfo(_self, campaignId);
+      auto exchangeItem = exchangeinfo.begin();
+      eosio_assert(exchangeItem != exchangeinfo.end(), "exchange does not exist");
+      eosio_assert(exchangeItem->status == ExchangeStatus::buying, "campaign is not running");
+      
+      exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
+        r.roundBuyVolume += quantity;
+      });
+      
+      buyorders_i buyorders(_self, campaignId);
+      auto buyOrderItem = buyorders.find(eosAccount.value);
+      eosio_assert(buyOrderItem != buyorders.end(), "to use exchange, create an order first with [buy] action");
+      
+      eosio_assert(buyOrderItem->sum == quantity, "you have to pay the exact sum you specified in your order");
+      
+      buyorders.modify(buyOrderItem, same_payer, [&](auto& r) {
+        r.isPaid = true;
+        r.timestamp = time_ms();
+      });
+    }
 	}
 	
 } // void scrugex::transfer
@@ -161,7 +186,8 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 		r.roundSellVolume = asset(0, supplyForSale.symbol);
 		r.roundBuyVolume = asset(0, supplyForSale.symbol);
 		r.investorsFund = asset(0, investmentSymbol);
-		r.endTimestamp = 0;
+		r.sellEndTimestamp = 0;
+		r.priceTimestamp = 0;
 	});
 
 	int scope = _getCampaignsCount();
@@ -178,7 +204,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 			"next milestone deadline should always come after previous");
 			
 		eosio_assert(milestone.deadline - lastDeadline > MIN_MILESTONE_DURATION,
-		  "milestone should be longer than 30 days");
+		  "milestone should be longer than 14 days");
 
 		lastDeadline = milestone.deadline;
 		totalFundsRelease += milestone.fundsReleasePercent;
@@ -260,6 +286,7 @@ void scrugex::extend(uint64_t campaignId) {
 	
 } // void scrugex::extend
 
+
 void scrugex::refund(uint64_t campaignId) {
   
 	// fetch campaign
@@ -280,7 +307,7 @@ void scrugex::refresh() {
 	auto now = time_ms();
 	campaigns_i campaigns(_self, _self.value);
 	
-	// refresh again in 5 minutes if nothing else turns up
+	// refresh again in x minutes if nothing else turns up
 	uint64_t nextRefreshTime = REFRESH_PERIOD;
 
 	for (auto& campaignItem: campaigns) {
@@ -346,6 +373,46 @@ void scrugex::refresh() {
 			continue;
 		}
 
+    // check exchange
+    
+    exchangeinfo_i exchangeinfo(_self, campaignItem.campaignId);
+    auto exchangeItem = exchangeinfo.begin();
+    
+    if (exchangeItem->status != ExchangeStatus::disabled) {
+      
+      // exchange sell period is over 
+      if (exchangeItem->status == ExchangeStatus::buying && exchangeItem->sellEndTimestamp > now) {
+      
+        sellorders_i sellorders(_self, campaignItem.campaignId);
+      
+        //close exchange if no orders exist
+        auto newStatus = sellorders.begin() == sellorders.end() ? 
+            ExchangeStatus::disabled : ExchangeStatus::buying;
+        
+        exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
+          r.status = newStatus;
+        });
+        
+        break;
+      }
+      
+      if (exchangeItem->status == ExchangeStatus::selling) {
+        
+        // lower auction price when needed
+        if (exchangeItem->priceTimestamp + EXCHANGE_PRICE_PERIOD > now) {
+          exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
+            r.priceTimestamp = now;
+            r.roundPrice /= 2;
+          });
+        }
+        
+        // check if can close deals
+        
+        
+        break;
+      }
+    }
+  
 		// check for ongoing voting
 
 		auto scope = campaignItem.campaignId;
@@ -460,8 +527,9 @@ void scrugex::refresh() {
 								
                 exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
                   r.status = ExchangeStatus::selling;
-                  r.endTimestamp = time_ms() + EXCHANGE_SELL_DURATION;
-                  r.previousPrice = r.roundPrice;
+                  r.sellEndTimestamp = time_ms() + EXCHANGE_SELL_DURATION;
+                  r.priceTimestamp = time_ms();
+                  r.previousPrice = r.roundPrice * EXCHANGE_PRICE_MULTIPLIER;
                   r.roundPrice = asset(0, r.roundPrice.symbol);
                   r.roundSellVolume = asset(0, r.roundSellVolume.symbol);
                   r.roundBuyVolume = asset(0, r.roundBuyVolume.symbol);
@@ -664,7 +732,7 @@ void scrugex::pay(uint64_t campaignId) {
 
 // exchange
 
-void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity) {
+void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity, asset sum) {
   require_auth(eosAccount);
   
   exchangeinfo_i exchangeinfo(_self, campaignId);
@@ -673,16 +741,21 @@ void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity) {
   eosio_assert(exchangeItem->status == ExchangeStatus::buying, "exchange doesn't take buy orders right now");
   
   eosio_assert(quantity.symbol.is_valid(), "invalid quantity");
-  eosio_assert(quantity.symbol == exchangeItem->roundBuyVolume.symbol, "incorrect symbol");
+  eosio_assert(quantity.symbol == exchangeItem->roundBuyVolume.symbol, "incorrect quantity symbol");
   
-  exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
-    r.roundBuyVolume += quantity;
-  });
+  eosio_assert(sum.symbol.is_valid(), "invalid price");
+  eosio_assert(sum.symbol == exchangeItem->investorsFund.symbol, "incorrect price symbol");
+  
+  auto price = sum.amount / quantity.amount;
+  eosio_assert(price > 0, "token price calculated with arguments passed is too low");
   
   buyorders_i buyorders(_self, campaignId);
   buyorders.emplace(eosAccount, [&](auto& r) {
     r.eosAccount = eosAccount;
     r.quantity = quantity;
+    r.sum = sum;
+    r.price = price;
+    r.isPaid = false;
     r.timestamp = time_ms();
   });
   
@@ -704,11 +777,15 @@ void scrugex::sell(name eosAccount, uint64_t campaignId, asset quantity) {
     r.roundSellVolume += quantity;
   });
   
+  // lower contribution amount 
+  
   sellorders_i sellorders(_self, campaignId);
   sellorders.emplace(eosAccount, [&](auto& r) {
     r.eosAccount = eosAccount;
     r.quantity = quantity;
-    r.timestamp = time_ms();
+    r.timestamp = 0;
+    r.attemptedPayment = false;
+    r.isPaid = false;
   });
   
 } // void scrugex::sell
@@ -785,4 +862,3 @@ extern "C" {
 		}
 	}
 };
-

@@ -43,7 +43,7 @@ public:
 	
 	// exchange
 	
-	ACTION buy(name eosAccount, uint64_t campaignId, asset quantity);
+	ACTION buy(name eosAccount, uint64_t campaignId, asset quantity, asset price);
 	
 	ACTION sell(name eosAccount, uint64_t campaignId, asset quantity);
 
@@ -389,7 +389,7 @@ private:
 		name eosAccount;
 		asset quantity;
 		
-		// refund/token distribution flags
+		// distribution flags
 		bool attemptedPayment;  // did attemt payment
 		bool isPaid;            // payment was successful
  
@@ -403,7 +403,7 @@ private:
 	asset quantity;
 	name eosAccount;
 	
-		// refund/token distribution flags
+		// distribution flags
 		bool attemptedPayment;  // did attemt payment
 		bool isPaid;            // payment was successful
  
@@ -443,7 +443,8 @@ private:
 		asset roundSellVolume;
 		asset roundBuyVolume;
 		asset investorsFund;
-		uint64_t endTimestamp;
+		uint64_t priceTimestamp;
+		uint64_t sellEndTimestamp;
 		
 		uint64_t primary_key() const { return 0; }
 	};
@@ -453,12 +454,19 @@ private:
     asset quantity;
     uint64_t timestamp;
     
+		// distribution flags
+		bool attemptedPayment;  // did attemt payment
+		bool isPaid;            // payment was successful
+ 
     uint64_t primary_key() const { return eosAccount.value; }
   };
 
   TABLE buyorders {
+    bool isPaid;
     name eosAccount;
     asset quantity;
+    asset sum;
+    uint64_t price;
     uint64_t timestamp;
     
     uint64_t primary_key() const { return eosAccount.value; }
