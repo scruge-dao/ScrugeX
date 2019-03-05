@@ -1,14 +1,8 @@
 #pragma once
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/asset.hpp>
-#include <string>
 
-using namespace eosio;
-using namespace std;
-
-// CONSTANTS
-
-const symbol& EOS_SYMBOL = symbol{"EOS", 4};
+const eosio::symbol& EOS_SYMBOL = eosio::symbol{"EOS", 4};
 
 const uint64_t SECOND = 1000;
 const uint64_t MINUTE = 60 * SECOND;
@@ -32,6 +26,9 @@ const uint64_t EXCHANGE_SELL_DURATION = 7 * DAY;
 
 // default refresh period 
 const uint64_t REFRESH_PERIOD = 5 * MINUTE;
+
+// minimum milestone duration
+const uint64_t MIN_MILESTONE_DURATION = 30 * DAY;
 
 // todo this should be an argument in extend action
 // and be saved inside a milestone/vote in question

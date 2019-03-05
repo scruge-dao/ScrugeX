@@ -1,5 +1,4 @@
 #pragma once
-#include <eosiolib/print.hpp>
 #include <eosiolib/transaction.hpp>
 #include <eosiolib/asset.hpp>
 

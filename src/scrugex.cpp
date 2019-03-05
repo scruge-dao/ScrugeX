@@ -176,6 +176,9 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 		// to-do validate milestone arguments (make sure it's complete)
 		eosio_assert(lastDeadline < milestone.deadline,
 			"next milestone deadline should always come after previous");
+			
+		eosio_assert(milestone.deadline - lastDeadline > MIN_MILESTONE_DURATION,
+		  "milestone should be longer than 30 days");
 
 		lastDeadline = milestone.deadline;
 		totalFundsRelease += milestone.fundsReleasePercent;
