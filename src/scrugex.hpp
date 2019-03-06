@@ -1,4 +1,5 @@
 #pragma once
+#include <cmath>
 #include <eosiolib/transaction.hpp>
 #include <eosiolib/asset.hpp>
 
@@ -55,6 +56,14 @@ private:
 	enum ExchangeStatus: uint8_t { inactive = 0, selling = 1, buying = 2 };
 	
 	enum VoteKind: uint8_t { extendDeadline = 0, milestoneResult = 1 };
+	
+	void _pay(uint64_t campaignId) {
+		action(
+			permission_level{ _self, "active"_n },
+			_self, "pay"_n,
+			make_tuple(campaignId)
+		).send();
+	} // void _pay
 
 	void _transfer(name account, asset quantity, string memo, name contract) {
 		action(
@@ -76,14 +85,6 @@ private:
 		).send();
 	} // void _send
 	
-	void _pay(uint64_t campaignId) {
-		action(
-			permission_level{ _self, "active"_n },
-			_self, "pay"_n,
-			make_tuple(campaignId)
-		).send();
-	} // void _pay
-
 	void _scheduleRefresh(uint64_t nextRefreshTime) {
   	cancel_deferred("refresh"_n.value);
   	
@@ -439,8 +440,8 @@ private:
 	
 	TABLE exchangeinfo {
 		uint8_t status;
-		asset previousPrice;
-		asset roundPrice;
+		double previousPrice;
+		double roundPrice;
 		asset roundSellVolume;
 		asset investorsFund;
 		uint64_t priceTimestamp;
@@ -450,8 +451,8 @@ private:
 	};
 	
   TABLE sellorders {
-    // to-do link with milestones to claim remaining eos from multiple exchange runs 
-    name eosAccount;
+    // to-do link with milestones to claim remaining eos from multiple exchange runs
+    uint64_t userId;
     asset quantity;
     uint64_t timestamp;
     
@@ -466,12 +467,12 @@ private:
     uint64_t key;
     // to-do link with milestones to claim remaining eos from multiple exchange runs 
     bool paymentReceived;
-    name eosAccount;
+    uint64_t userId;
     asset quantity;
     asset sum;
-    asset price;
+    double price;
     uint64_t timestamp;
-    asset spent;
+    asset purchased;
     
 		// distribution flags
 		bool attemptedPayment;  // did attemt payment
@@ -479,7 +480,7 @@ private:
  
     uint64_t primary_key() const { return key; }
     // to-do secondary sort by timestamp
-    uint64_t by_price() const { return numeric_limits<uint64_t>::max() - price.amount; } 
+    uint64_t by_price() const { return numeric_limits<uint64_t>::max() - (uint64_t)(price * 1000000000.) ; } 
   };
 
 	// tables

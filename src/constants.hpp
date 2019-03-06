@@ -25,7 +25,7 @@ const uint64_t VOTING_DURATION = 7 * DAY; // to-do change to percentage
 const uint64_t EXCHANGE_SELL_DURATION = 15 * SECOND; // 3 * DAY;
 
 // multiply previous auction price to this value
-const uint64_t EXCHANGE_PRICE_MULTIPLIER = 5;
+const double EXCHANGE_PRICE_MULTIPLIER = 5;
 
 // default refresh period 
 const uint64_t REFRESH_PERIOD = 5 * MINUTE;
