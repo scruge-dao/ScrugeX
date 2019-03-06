@@ -107,16 +107,24 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
       eosio_assert(exchangeItem != exchangeinfo.end(), "exchange does not exist");
       eosio_assert(exchangeItem->status == ExchangeStatus::buying, "campaign is not running");
       
+      bool didAccept = false;
+      
+      // to-do sort
       buyorders_i buyorders(_self, campaignId);
-      auto buyOrderItem = buyorders.find(eosAccount.value);
-      eosio_assert(buyOrderItem != buyorders.end(), "to use exchange, create an order first with [buy] action");
+      for (auto& orderItem : buyorders) {
+        if (orderItem.eosAccount != eosAccount || orderItem.sum != quantity || orderItem.paymentReceived) {
+          continue;
+        }
+        
+        didAccept = true;
+        buyorders.modify(orderItem, same_payer, [&](auto& r) {
+          r.paymentReceived = true;
+          r.timestamp = time_ms();
+        });
+        break;
+      }
       
-      eosio_assert(buyOrderItem->sum == quantity, "you have to pay the exact sum you specified in your order");
-      
-      buyorders.modify(buyOrderItem, same_payer, [&](auto& r) {
-        r.paymentReceived = true;
-        r.timestamp = time_ms();
-      });
+      eosio_assert(didAccept, "to use exchange, create an order first with [buy] action and transfer the exact amount specified in the order");
     }
 	}
 	
