@@ -410,6 +410,11 @@ void scrugex::refresh() {
         
         for (auto& orderItem : ordersByPrice) {
           
+          // process this exchange only
+          if (orderItem.milestoneId != exchangeItem->milestoneId) {
+            continue;
+          }
+          
           if (orderItem.price < exchangeItem->roundPrice) {
             break;
           }
@@ -421,31 +426,49 @@ void scrugex::refresh() {
           sellVolume -= purchaseAmount;
           
           if (purchaseAmount > 0) {
-
-            // to-do make sure this rounds up
+            
             uint64_t cost = (uint64_t) ceil((double)purchaseAmount * (double)exchangeItem->roundPrice);
-
+            
             auto item = buyorders.find(orderItem.key);
             buyorders.modify(item, same_payer, [&](auto& r) {
               r.purchased = asset(purchaseAmount, r.purchased.symbol);
+              r.spent = asset(cost, r.spent.symbol);
             });
           }
           else {
             auto item = buyorders.find(orderItem.key);
             buyorders.modify(item, same_payer, [&](auto& r) {
               r.purchased = asset(0, r.purchased.symbol);
+              r.spent = asset(0, r.spent.symbol);
             });
           }
         }
         
         if (sellVolume == 0) {
           
+          // process sell orders 
+          
+          sellorders_i sellorders(_self, campaignItem.campaignId);
+          
+          for (auto& orderItem : sellorders) {
+            
+            // process this exchange only
+            if (orderItem.milestoneId != exchangeItem->milestoneId) {
+              continue;
+            }
+            
+            uint64_t cost = (uint64_t) ceil((double)orderItem.quantity.amount * (double)exchangeItem->roundPrice);
+            sellorders.modify(orderItem, same_payer, [&](auto& r) {
+              r.received = asset(cost, r.received.symbol);
+            });
+          }
+          
           // close exchange
           exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
             r.status = ExchangeStatus::inactive;
           });
           
-          _schedulePay();
+          _schedulePay(campaignItem.campaignId);
         }
         
         break;
@@ -570,6 +593,7 @@ void scrugex::refresh() {
 								}
 								
                 exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
+                  r.milestoneId = nextMilestoneId;
                   r.status = ExchangeStatus::selling;
                   r.sellEndTimestamp = now + EXCHANGE_SELL_DURATION;
                   r.priceTimestamp = now;
@@ -695,11 +719,31 @@ void scrugex::pay(uint64_t campaignId) {
 	auto campaignItem = campaigns.find(campaignId);
 	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 	auto scope = campaignItem->campaignId;
+
+  // uint64_t userId = _verify(eosAccount, campaignItem->kycEnabled);
 	
-	eosio_assert(campaignItem->status == Status::refunding || 
-							campaignItem->status == Status::distributing ||
-							campaignItem->status == Status::excessReturning,
-			"this campaign is not paying anyone right now");
+	// check sell orders
+	sellorders_i sellorders(_self, campaignId);
+	auto notAttemptedSellOrders = sellorders.get_index<"byap"_n>();
+	
+	for (auto& orderItem : notAttemptedSellOrders) {
+	
+	  exchangeinfo_i exchangeinfo(_self, campaignId);
+	  auto exchangeItem = exchangeinfo.begin();
+	
+	
+	}
+
+	// check buy orders
+	
+	
+	
+	// check other payments
+	
+// 	eosio_assert(campaignItem->status == Status::refunding || 
+// 							campaignItem->status == Status::distributing ||
+// 							campaignItem->status == Status::excessReturning,
+// 			"this campaign is not paying anyone right now");
 	
 	// if refunding (both not reached soft cap or milestone vote failed)
 	// or if campaign is over and tokens are distributing to buyers
@@ -795,7 +839,6 @@ void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity, asset su
   eosio_assert(sum.symbol.is_valid(), "invalid price");
   eosio_assert(sum.symbol == exchangeItem->investorsFund.symbol, "incorrect price symbol");
 
-  
   // to-do calculate eos/token instead? or some other way to store price
   double price = (double)sum.amount / (double)quantity.amount;
   
@@ -803,6 +846,7 @@ void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity, asset su
   
   buyorders_i buyorders(_self, campaignId);
   buyorders.emplace(eosAccount, [&](auto& r) {
+    r.milestoneId = exchangeItem->milestoneId;
     r.key = buyorders.available_primary_key();
     r.userId = userId;
     r.quantity = quantity;
@@ -846,6 +890,7 @@ void scrugex::sell(name eosAccount, uint64_t campaignId, asset quantity) {
   
   sellorders_i sellorders(_self, campaignId);
   sellorders.emplace(eosAccount, [&](auto& r) {
+    r.milestoneId = exchangeItem->milestoneId;
     r.userId = userId;
     r.quantity = quantity;
     r.timestamp = time_ms();

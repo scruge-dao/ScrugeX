@@ -439,6 +439,7 @@ private:
 	};
 	
 	TABLE exchangeinfo {
+	  uint64_t milestoneId;
 		uint8_t status;
 		double previousPrice;
 		double roundPrice;
@@ -451,19 +452,23 @@ private:
 	};
 	
   TABLE sellorders {
+    uint64_t milestoneId;
     // to-do link with milestones to claim remaining eos from multiple exchange runs
     uint64_t userId;
     asset quantity;
     uint64_t timestamp;
+    asset received;
     
 		// distribution flags
 		bool attemptedPayment;  // did attemt payment
 		bool isPaid;            // payment was successful
  
-    uint64_t primary_key() const { return eosAccount.value; }
+    uint64_t primary_key() const { return userId; }
+		uint64_t by_not_attempted_payment() const { return attemptedPayment ? 1 : 0; }
   };
 
   TABLE buyorders {
+    uint64_t milestoneId;
     uint64_t key;
     // to-do link with milestones to claim remaining eos from multiple exchange runs 
     bool paymentReceived;
@@ -473,13 +478,18 @@ private:
     double price;
     uint64_t timestamp;
     asset purchased;
+    asset spent;
     
 		// distribution flags
 		bool attemptedPayment;  // did attemt payment
 		bool isPaid;            // payment was successful
  
-    uint64_t primary_key() const { return key; }
-    // to-do secondary sort by timestamp
+    // descending sort by key 
+    uint64_t primary_key() const { return numeric_limits<uint64_t>::max() - key; }
+    
+		uint64_t by_not_attempted_payment() const { return attemptedPayment ? 1 : 0; }
+    
+    // to-do sort by milestone -> price -> timestamp 
     uint64_t by_price() const { return numeric_limits<uint64_t>::max() - (uint64_t)(price * 1000000000.) ; } 
   };
 
@@ -504,10 +514,14 @@ private:
 	// exchange
 	
   typedef multi_index<"exchangeinfo"_n, exchangeinfo> exchangeinfo_i;
-  typedef multi_index<"sellorders"_n, sellorders> sellorders_i;
+  
+  typedef multi_index<"sellorders"_n, sellorders,
+		indexed_by<"byap"_n, const_mem_fun<sellorders, uint64_t, &sellorders::by_not_attempted_payment>>
+		  > sellorders_i;
   
   typedef multi_index<"buyorders"_n, buyorders,
-    indexed_by<"bypricedesc"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_price>>
+    indexed_by<"bypricedesc"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_price>>,
+		indexed_by<"byap"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_not_attempted_payment>>
       > buyorders_i;
 
 	// to access kyc/aml table
