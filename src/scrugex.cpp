@@ -681,7 +681,7 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
       r.isPaid = true;
     });
     
-    // send back unused tokens 
+    // send back unused tokens
     if (orderItem.received.amount > 0) {
       _transfer(orderItem.eosAccount, orderItem.received, "ScrugeX: Tokens Sold on Exchange");
     }
@@ -709,7 +709,7 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
     });
     
     asset diff = orderItem.sum - orderItem.spent;
-    if (diff.amount > 0) {
+    if (diff.amount > 0 && orderItem.paymentReceived) {
       _transfer(orderItem.eosAccount, diff, "ScrugeX: Tokens Purchased on Exchange");
     }
    
@@ -815,6 +815,8 @@ void scrugex::pay(uint64_t campaignId) {
 	auto notAttemptedBuyOrders = buyorders.get_index<"byap"_n>();
 	
   for (auto& orderItem : notAttemptedBuyOrders) {
+    
+    if (!orderItem.paymentReceived) { continue; }
     
     if (orderItem.attemptedPayment || orderItem.isPaid) {
       break;
