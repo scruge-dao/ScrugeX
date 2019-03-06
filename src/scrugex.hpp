@@ -453,7 +453,9 @@ private:
 	
   TABLE sellorders {
     uint64_t milestoneId;
+    uint64_t key;
     name eosAccount;
+    
     // to-do link with milestones to claim remaining eos from multiple exchange runs
     uint64_t userId;
     asset quantity;
@@ -464,7 +466,7 @@ private:
 		bool attemptedPayment;  // did attemt payment
 		bool isPaid;            // payment was successful
  
-    uint64_t primary_key() const { return userId; }
+    uint64_t primary_key() const { return key; }
 		uint64_t by_not_attempted_payment() const { return attemptedPayment ? 1 : 0; }
   };
 

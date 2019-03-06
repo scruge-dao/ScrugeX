@@ -405,7 +405,9 @@ void scrugex::refresh() {
         if (exchangeItem->priceTimestamp + EXCHANGE_PRICE_PERIOD < now) {
           exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
             r.priceTimestamp = now;
-            r.roundPrice /= 10; // to-do formula
+            
+            r.roundPrice /= 2; // to-do formula
+            eosio::print("new price: ");eosio::print(r.roundPrice);eosio::print("\n");
           });
         }
         
@@ -477,8 +479,12 @@ void scrugex::refresh() {
           }
           
           // close exchange
+          
           exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
             r.status = ExchangeStatus::inactive;
+            r.previousPrice = r.roundPrice;
+            
+            eosio::print("new prev price: ");eosio::print(r.roundPrice);eosio::print("\n");
           });
           
           _schedulePay(campaignItem.campaignId);
@@ -601,19 +607,20 @@ void scrugex::refresh() {
 								exchangeinfo_i exchangeinfo(_self, campaignItem.campaignId);
 								auto exchangeItem = exchangeinfo.begin();
 								
-								auto newPrice = exchangeItem->roundPrice;
+								auto newPrice = exchangeItem->previousPrice;
 								if (newPrice == 0) {
-								  newPrice = (double)campaignItem.raised.amount / (double)campaignItem.supplyForSale.amount;
+								  eosio::print("yeh wtf");eosio::print("\n");
+								  newPrice = (double)campaignItem.raised.amount / (double)campaignItem.supplyForSale.amount * EXCHANGE_PRICE_MULTIPLIER;
 								}
 								
                 exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
                   r.milestoneId = nextMilestoneId;
                   r.status = ExchangeStatus::selling;
                   r.sellEndTimestamp = now + EXCHANGE_SELL_DURATION;
-                  r.priceTimestamp = now;
-                  r.previousPrice = r.roundPrice * EXCHANGE_PRICE_MULTIPLIER;
-                  r.roundPrice = newPrice;
+                  r.roundPrice = newPrice * EXCHANGE_PRICE_MULTIPLIER;
                   r.roundSellVolume = asset(0, r.roundSellVolume.symbol);
+                  
+                  eosio::print("start new price: ");eosio::print(r.roundPrice);eosio::print("\n");
                 });
 							}
 						}
@@ -663,7 +670,6 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 	auto scope = campaignItem->campaignId;
 	
-	
 	// check sell orders
 	sellorders_i sellorders(_self, campaignId);
 	auto notAttemptedSellOrders = sellorders.get_index<"byap"_n>();
@@ -673,9 +679,9 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
       continue;
     }
     
-    if (orderItem.isPaid) { break; }
+    if (orderItem.isPaid) { continue; }
     
-    auto item = sellorders.find(orderItem.userId);
+    auto item = sellorders.find(orderItem.key);
     sellorders.modify(orderItem, same_payer, [&](auto& r) {
       r.attemptedPayment = true;
       r.isPaid = true;
@@ -700,7 +706,7 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
       continue;
     }
     
-    if (orderItem.isPaid) { break; }
+    if (orderItem.isPaid) { continue; }
     
     auto item = buyorders.find(orderItem.key);
     buyorders.modify(item, same_payer, [&](auto& r) {
@@ -798,7 +804,7 @@ void scrugex::pay(uint64_t campaignId) {
       break;
     }
     
-    auto item = sellorders.find(orderItem.userId);
+    auto item = sellorders.find(orderItem.key);
     sellorders.modify(orderItem, same_payer, [&](auto& r) {
       r.attemptedPayment = true;
     });
@@ -988,6 +994,7 @@ void scrugex::sell(name eosAccount, uint64_t campaignId, asset quantity) {
   sellorders_i sellorders(_self, campaignId);
   sellorders.emplace(eosAccount, [&](auto& r) {
     r.milestoneId = exchangeItem->milestoneId;
+    r.key = sellorders.available_primary_key();
     r.userId = userId;
     r.eosAccount = eosAccount;
     r.quantity = quantity;
