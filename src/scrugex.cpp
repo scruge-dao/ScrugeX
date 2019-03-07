@@ -405,22 +405,22 @@ void scrugex::refresh() {
         if (exchangeItem->priceTimestamp + EXCHANGE_PRICE_PERIOD < now) {
           exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
             r.priceTimestamp = now;
-            
             r.roundPrice /= 2; // to-do formula
-            eosio::print("new price: ");eosio::print(r.roundPrice);eosio::print("\n");
           });
         }
         
         // check if should close because of price threshold
         
         buyorders_i buyorders(_self, campaignItem.campaignId);
-        auto ordersByPrice = buyorders.get_index<"bypricedesc"_n>();
+        auto ordersByPrice = buyorders.get_index<"bypricedesc"_n>(); // to-do smart sort milestone -> price -> time
         
         auto sellVolume = exchangeItem->roundSellVolume.amount;
         
+        vector<uint64_t> ids;
+        
         for (auto& orderItem : ordersByPrice) {
           
-          // process this exchange only
+          // process current exchange only
           if (orderItem.milestoneId != exchangeItem->milestoneId) {
             continue;
           }
@@ -440,19 +440,21 @@ void scrugex::refresh() {
           
           if (purchaseAmount > 0) {
             
-            uint64_t cost = (uint64_t) ceil((double)purchaseAmount * (double)exchangeItem->roundPrice);
+            ids.push_back(orderItem.key);
+            
+            double cost = (double)purchaseAmount * (double)exchangeItem->roundPrice;
             
             auto item = buyorders.find(orderItem.key);
             buyorders.modify(item, same_payer, [&](auto& r) {
               r.purchased = asset(purchaseAmount, r.purchased.symbol);
-              r.spent = asset(cost, r.spent.symbol);
+              r.spent = cost;
             });
           }
           else {
             auto item = buyorders.find(orderItem.key);
             buyorders.modify(item, same_payer, [&](auto& r) {
               r.purchased = asset(0, r.purchased.symbol);
-              r.spent = asset(0, r.spent.symbol);
+              r.spent = 0;
             });
           }
         }
@@ -461,10 +463,34 @@ void scrugex::refresh() {
           
           // process sell orders 
           
-          // to-do update contribution records  
+          for (auto& id : ids) {
+            auto orderItem = buyorders.find(id);
+            
+            contributions_i contributions(_self, campaignItem.campaignId);
+            auto contributionItem = contributions.find(orderItem->userId);
+            auto spent = (uint64_t) floor(orderItem->spent);
+            
+            if (contributionItem == contributions.end()) {
+              campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+                r.backersCount += 1;
+              });
+              
+              contributions.emplace(_self, [&](auto& r) {
+                r.userId = orderItem->userId;
+            		r.eosAccount = orderItem->eosAccount;
+            		r.quantity = asset(spent, orderItem->sum.symbol);
+            		r.attemptedPayment = false;
+            		r.isPaid = false;
+              });
+            }
+            else {
+              contributions.modify(contributionItem, same_payer, [&](auto& r) {
+                r.quantity -= asset(spent, r.quantity.symbol);
+              });
+            }
+          }
           
           sellorders_i sellorders(_self, campaignItem.campaignId);
-          
           for (auto& orderItem : sellorders) {
             
             // process this exchange only
@@ -472,19 +498,32 @@ void scrugex::refresh() {
               continue;
             }
             
+            contributions_i contributions(_self, campaignItem.campaignId);
+            auto contributionItem = contributions.find(orderItem.userId);
+            
             uint64_t cost = (uint64_t) floor((double)orderItem.quantity.amount * (double)exchangeItem->roundPrice);
             sellorders.modify(orderItem, same_payer, [&](auto& r) {
               r.received = asset(cost, r.received.symbol);
             });
+            
+            if (contributionItem->quantity == orderItem.received) {
+              campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+                r.backersCount -= 1;
+              });
+              
+              contributions.erase(contributionItem);
+            }
+            else {
+              contributions.modify(contributionItem, same_payer, [&](auto& r) {
+                r.quantity -= orderItem.received;
+              });
+            }
           }
           
           // close exchange
           
           exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
             r.status = ExchangeStatus::inactive;
-            r.previousPrice = r.roundPrice;
-            
-            eosio::print("new prev price: ");eosio::print(r.roundPrice);eosio::print("\n");
           });
           
           _schedulePay(campaignItem.campaignId);
@@ -609,7 +648,6 @@ void scrugex::refresh() {
 								
 								auto newPrice = exchangeItem->previousPrice;
 								if (newPrice == 0) {
-								  eosio::print("yeh wtf");eosio::print("\n");
 								  newPrice = (double)campaignItem.raised.amount / (double)campaignItem.supplyForSale.amount * EXCHANGE_PRICE_MULTIPLIER;
 								}
 								
@@ -617,10 +655,9 @@ void scrugex::refresh() {
                   r.milestoneId = nextMilestoneId;
                   r.status = ExchangeStatus::selling;
                   r.sellEndTimestamp = now + EXCHANGE_SELL_DURATION;
+                  r.previousPrice = r.roundPrice;
                   r.roundPrice = newPrice * EXCHANGE_PRICE_MULTIPLIER;
                   r.roundSellVolume = asset(0, r.roundSellVolume.symbol);
-                  
-                  eosio::print("start new price: ");eosio::print(r.roundPrice);eosio::print("\n");
                 });
 							}
 						}
@@ -714,7 +751,7 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
       r.isPaid = true;
     });
     
-    asset diff = orderItem.sum - orderItem.spent;
+    asset diff = asset(orderItem.sum.amount - (uint64_t) ceil(orderItem.spent), orderItem.sum.symbol);
     if (diff.amount > 0 && orderItem.paymentReceived) {
       _transfer(orderItem.eosAccount, diff, "ScrugeX: Tokens Purchased on Exchange");
     }
@@ -741,8 +778,9 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
     
     // if campaign is over and tokens are being distributed to backers
     else {
-      uint64_t paymentAmount = campaignItem->supplyForSale.amount *
-          contributionItem->quantity.amount / campaignItem->raised.amount; // to-do CHECK FOR OVERFLOW
+      uint64_t paymentAmount = (uint64_t) floor((double)campaignItem->supplyForSale.amount /
+          (double)campaignItem->raised.amount * (double)contributionItem->quantity.amount);
+          
       auto paymentQuantity = asset(paymentAmount, campaignItem->supplyForSale.symbol);
       _transfer(eosAccount, paymentQuantity, "ScrugeX: Tokens Distribution", campaignItem->tokenContract);
       
@@ -751,8 +789,9 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 			auto exchangeItem = exchangeinfo.begin();
 			auto fund = exchangeItem->investorsFund;
 			
-			uint64_t fundPaymentAmount = exchangeItem->investorsFund.amount *
-          contributionItem->quantity.amount / campaignItem->raised.amount; // to-do CHECK FOR OVERFLOW
+			uint64_t fundPaymentAmount = (uint64_t) floor((double)exchangeItem->investorsFund.amount /
+          (double)campaignItem->raised.amount * (double)contributionItem->quantity.amount); 
+      
       if (fundPaymentAmount > 0) {
         auto fundPaymentQuantity = asset(fundPaymentAmount, exchangeItem->investorsFund.symbol);
         _transfer(eosAccount, fundPaymentQuantity, "ScrugeX: Exchange Fund Payment");
@@ -959,7 +998,7 @@ void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity, asset su
     r.paymentReceived = false;
     r.timestamp = time_ms();
     r.purchased = asset(0, quantity.symbol);
-    r.spent = asset(0, sum.symbol);
+    r.spent = 0;
   });
   
 } // void scrugex::buy

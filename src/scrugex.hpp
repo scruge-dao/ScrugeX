@@ -482,7 +482,7 @@ private:
     double price;
     uint64_t timestamp;
     asset purchased;
-    asset spent;
+    double spent;
     
 		// distribution flags
 		bool attemptedPayment;  // did attemt payment
@@ -493,7 +493,7 @@ private:
     
 		uint64_t by_not_attempted_payment() const { return attemptedPayment ? 1 : 0; }
     
-    // to-do sort by milestone -> price -> timestamp 
+    // to-do smart sort by milestone -> price -> timestamp 
     uint64_t by_price() const { return numeric_limits<uint64_t>::max() - (uint64_t)(price * 1000000000.) ; } 
   };
 
