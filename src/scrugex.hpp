@@ -94,6 +94,7 @@ private:
   									 make_tuple());
   	t.delay_sec = nextRefreshTime;
   	t.send("refresh"_n.value, _self, false);
+  	
 	} // void _scheduleRefresh
 	
 	void _schedulePay(uint64_t campaignId) {

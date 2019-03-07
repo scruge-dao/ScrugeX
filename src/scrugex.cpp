@@ -987,6 +987,9 @@ void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity, asset su
   
   eosio_assert(price > 0, "token price calculated with arguments passed is too low");
   
+  eosio_assert(price <= exchangeItem->roundPrice,
+    "token price calculated with arguments can not be higher than current auction price");
+  
   buyorders_i buyorders(_self, campaignId);
   buyorders.emplace(eosAccount, [&](auto& r) {
     r.milestoneId = exchangeItem->milestoneId;
@@ -1026,6 +1029,17 @@ void scrugex::sell(name eosAccount, uint64_t campaignId, asset quantity) {
   
   eosio_assert(quantity.symbol.is_valid(), "invalid quantity");
   eosio_assert(quantity.symbol == exchangeItem->roundSellVolume.symbol, "incorrect symbol");
+  
+  contributions_i contributions(_self, campaignId);
+  auto contributionItem = contributions.find(userId);
+  
+  eosio_assert(contributionItem != contributions.end(), "you need to be an investor to sell tokens");
+  
+  // how many tokens will this contribution allows me
+  uint64_t paymentAmount = (uint64_t) floor((double)campaignItem->supplyForSale.amount /
+          (double)campaignItem->raised.amount * (double)contributionItem->quantity.amount);
+          
+  eosio_assert(paymentAmount >= quantity.amount, "can not sell more tokens that you have");
   
   exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
     r.roundSellVolume += quantity;
