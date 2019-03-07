@@ -405,7 +405,7 @@ void scrugex::refresh() {
         if (exchangeItem->priceTimestamp + EXCHANGE_PRICE_PERIOD < now) {
           exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
             r.priceTimestamp = now;
-            r.roundPrice /= 2; // to-do formula
+            r.roundPrice /= 5; // to-do formula
           });
         }
         
@@ -415,6 +415,8 @@ void scrugex::refresh() {
         auto ordersByPrice = buyorders.get_index<"bypricedesc"_n>(); // to-do smart sort milestone -> price -> time
         
         auto sellVolume = exchangeItem->roundSellVolume.amount;
+        double roundPrice = (double)exchangeItem->roundPrice;
+        double pICO = (double)campaignItem.raised.amount / (double)campaignItem.supplyForSale.amount;
         
         vector<uint64_t> ids;
         
@@ -432,17 +434,14 @@ void scrugex::refresh() {
             break;
           }
           
-          uint64_t purchaseAmount = orderItem.quantity.amount;
-          if (orderItem.quantity.amount > sellVolume) {
-            purchaseAmount = sellVolume;
-          }
+          uint64_t purchaseAmount = min(orderItem.quantity.amount, sellVolume);
           sellVolume -= purchaseAmount;
           
           if (purchaseAmount > 0) {
             
             ids.push_back(orderItem.key);
             
-            double cost = (double)purchaseAmount * (double)exchangeItem->roundPrice;
+            double cost = (double)purchaseAmount * roundPrice;
             
             auto item = buyorders.find(orderItem.key);
             buyorders.modify(item, same_payer, [&](auto& r) {
@@ -459,10 +458,9 @@ void scrugex::refresh() {
           }
         }
         
+        
+        // closing exchange
         if (sellVolume == 0) {
-          
-          // process sell orders 
-          
           for (auto& id : ids) {
             auto orderItem = buyorders.find(id);
             
@@ -501,12 +499,12 @@ void scrugex::refresh() {
             contributions_i contributions(_self, campaignItem.campaignId);
             auto contributionItem = contributions.find(orderItem.userId);
             
-            uint64_t cost = (uint64_t) floor((double)orderItem.quantity.amount * (double)exchangeItem->roundPrice);
+            uint64_t cost = (uint64_t) floor((double)orderItem.quantity.amount * min(roundPrice, pICO));
             sellorders.modify(orderItem, same_payer, [&](auto& r) {
               r.received = asset(cost, r.received.symbol);
             });
             
-            if (contributionItem->quantity == orderItem.received) {
+            if (contributionItem->quantity.amount == cost) {
               campaigns.modify(campaignItem, same_payer, [&](auto& r) {
                 r.backersCount -= 1;
               });
@@ -515,14 +513,18 @@ void scrugex::refresh() {
             }
             else {
               contributions.modify(contributionItem, same_payer, [&](auto& r) {
-                r.quantity -= orderItem.received;
+                r.quantity -= asset(cost, r.quantity.symbol);
               });
             }
           }
           
           // close exchange
           
+          double diff = roundPrice - pICO;
+          uint64_t fundAmount = (uint64_t) floor((double)exchangeItem->roundSellVolume.amount * diff);
+            
           exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
+            r.investorsFund += asset(fundAmount, r.investorsFund.symbol);
             r.status = ExchangeStatus::inactive;
           });
           
@@ -648,7 +650,8 @@ void scrugex::refresh() {
 								
 								auto newPrice = exchangeItem->previousPrice;
 								if (newPrice == 0) {
-								  newPrice = (double)campaignItem.raised.amount / (double)campaignItem.supplyForSale.amount * EXCHANGE_PRICE_MULTIPLIER;
+								  double pICO = (double)campaignItem.raised.amount / (double)campaignItem.supplyForSale.amount;
+								  newPrice = pICO * EXCHANGE_PRICE_MULTIPLIER;
 								}
 								
                 exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
