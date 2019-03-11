@@ -1,25 +1,24 @@
-#define CHECK(x) tie(t, action) = (x)(campaignItem, campaigns); if (action == RefreshAction::pass) {} else if (action == RefreshAction::doneT) { nextRefreshTime = t; break; } else if (action == RefreshAction::done) { break; } else if (action == RefreshAction::skip) { continue; }
+#define R_CHECK(x) tie(t, action) = (x)(campaignItem, campaigns); if (action == RefreshAction::pass) {} else if (action == RefreshAction::doneT) { nextRefreshTime = t; break; } else if (action == RefreshAction::done) { break; } else if (action == RefreshAction::skip) { continue; }
 
 void scrugex::refresh() {
 	require_auth(_self);
 	
+	INIT
+	
 	campaigns_i campaigns(_self, _self.value);
-	uint64_t t = 0, nextRefreshTime = REFRESH_PERIOD;
-	RefreshAction action;
-
 	for (auto& campaignItem: campaigns) {
 
-		CHECK(_campaignOver)
+		R_CHECK(_campaignOver)
 		
-		CHECK(_fundingComplete)
+		R_CHECK(_fundingComplete)
 		
-		CHECK(_waitingOver)
+		R_CHECK(_waitingOver)
 
-    CHECK(_isRefunding)
+    R_CHECK(_isRefunding)
     
-    CHECK(_runExchange)
+    R_CHECK(_runExchange)
     
-		CHECK(_voting)
+		R_CHECK(_voting)
 	}
 
 	if (nextRefreshTime != 0) {

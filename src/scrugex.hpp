@@ -284,6 +284,30 @@ private:
 			r.status = Status::activeVote;
 		});
 	} // void _startvote
+	
+	
+  void _startExchange(uint64_t campaignId, uint64_t nextMilestoneId) {
+    exchangeinfo_i exchangeinfo(_self, campaignId);
+		auto exchangeItem = exchangeinfo.begin();
+		campaigns_i campaigns(_self, _self.value);
+		auto campaignItem = campaigns.find(campaignId);
+		
+		auto newPrice = exchangeItem->previousPrice;
+		if (newPrice == 0) {
+		  double pICO = (double)campaignItem->raised.amount / (double)campaignItem->supplyForSale.amount;
+		  newPrice = pICO * EXCHANGE_PRICE_MULTIPLIER;
+		}
+		
+    exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
+      r.milestoneId = nextMilestoneId;
+      r.status = ExchangeStatus::selling;
+      r.sellEndTimestamp = time_ms() + EXCHANGE_SELL_DURATION;
+      r.previousPrice = r.roundPrice;
+      r.roundPrice = newPrice * EXCHANGE_PRICE_MULTIPLIER;
+      r.roundSellVolume = asset(0, r.roundSellVolume.symbol);
+    });
+    
+  } // void _startExchange
 
 	void _refund(uint64_t campaignId) {
     campaigns_i campaigns(_self, _self.value);
@@ -556,6 +580,7 @@ private:
   #define SKIP return make_tuple(0, RefreshAction::skip);
   #define DONE_ return make_tuple(0, RefreshAction::done);
   #define DONE(x) return make_tuple((x), RefreshAction::doneT);
+  #define INIT uint64_t t = 0, nextRefreshTime = REFRESH_PERIOD; RefreshAction action;
   
   PARAM _campaignOver(const campaigns& campaignItem, campaigns_i& campaigns) {
     if (time_ms() < campaignItem.endTimestamp || campaignItem.active == false) {
@@ -615,159 +640,170 @@ private:
 		PASS
   } // PARAM _isRefunding
   
+  #define V_CHECK(x) tie(t, action) = (x)(*votingItem, campaignItem, campaigns); if (action == RefreshAction::pass) {} else if (action == RefreshAction::doneT) { DONE(t) } else if (action == RefreshAction::done) { DONE_ } else if (action == RefreshAction::skip) { SKIP }
+  
   PARAM _voting(const campaigns& campaignItem, campaigns_i& campaigns) {
-    uint64_t nextRefreshTime = REFRESH_PERIOD;
-    uint64_t now = time_ms();
+    INIT
     
-		milestones_i milestones(_self, campaignItem.campaignId);
-		auto milestoneId = campaignItem.currentMilestone;
-		auto currentMilestoneItem = milestones.find(milestoneId);
 		voting_i voting(_self, campaignItem.campaignId);
-    
     auto activeVoting = voting.get_index<"byactive"_n>();
     auto votingItem = activeVoting.begin();
     
-		// check extend deadline votings
-		if (votingItem->active && votingItem->milestoneId == milestoneId && votingItem->kind == VoteKind::extendDeadline) {
-
-			// extend voting should be over
-			if (votingItem->endTimestamp < now || votingItem->voters == campaignItem.backersCount) {
-				
-				// stop it
-				_stopvote(campaignItem.campaignId);
-
-				// calculate decision
-				if (votingItem->positiveWeight >= get_percent(votingItem->votedWeight, T1)) {
-
-					// to-do test and complete
-
-					// extend all subsequent deadlines
-					for (auto& milestoneItem: milestones) {
-						if (milestoneItem.deadline >= currentMilestoneItem->deadline) {
-							milestones.modify(milestoneItem, same_payer, [&](auto& r) {
-								r.deadline += TIMET;
-							});
-						}
-					}
-
-					// go back to milestone
-					campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-						r.status = Status::milestone;
-					});
-					
-					// to-do correct timers?
-				}
-			
-				DONE(1)
-			}
-	  }
-
-		if (currentMilestoneItem->deadline < now) {
-		  
-		  if (votingItem->active && votingItem->milestoneId == milestoneId && votingItem->kind == VoteKind::milestoneResult) {
-			
-				// milestone voting should be over  
-				if (votingItem->endTimestamp < now || votingItem->voters == campaignItem.backersCount) {
-					
-					// stop it
-					_stopvote(campaignItem.campaignId);
-					
-					// calculate decision
-					if (votingItem->positiveWeight >= get_percent(votingItem->votedWeight, T1)) {
-						
-						// milestone vote success
-						
-						// release this part of funds 
-						auto percent = get_percent(campaignItem.raised.amount, 
-													 currentMilestoneItem->fundsReleasePercent);
-						auto quantity = campaignItem.raised;
-						quantity.amount = percent;
-						_transfer(campaignItem.founderEosAccount, quantity, "ScrugeX: Milestone Payment");
-						
-						campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-							r.releasedPercent += currentMilestoneItem->fundsReleasePercent;
-						});
-
-						// get next milestone
-						uint64_t nextMilestoneId = campaignItem.currentMilestone + 1;
-						auto nextMilestoneItem = milestones.find(nextMilestoneId);
-
-						if (nextMilestoneItem == milestones.end()) {
-
-							// no more milestones
-							// start distributing tokens
-							campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-								r.status = Status::distributing;
-							});
-							
-							_schedulePay(campaignItem.campaignId);
-						}
-						else {
-							
-							// switch milestone
-							campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-								r.currentMilestone = nextMilestoneId;
-								r.status = Status::milestone;
-							});
-							
-							// enable exchange 
-							exchangeinfo_i exchangeinfo(_self, campaignItem.campaignId);
-							auto exchangeItem = exchangeinfo.begin();
-							
-							auto newPrice = exchangeItem->previousPrice;
-							if (newPrice == 0) {
-							  double pICO = (double)campaignItem.raised.amount / (double)campaignItem.supplyForSale.amount;
-							  newPrice = pICO * EXCHANGE_PRICE_MULTIPLIER;
-							}
-							
-              exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
-                r.milestoneId = nextMilestoneId;
-                r.status = ExchangeStatus::selling;
-                r.sellEndTimestamp = now + EXCHANGE_SELL_DURATION;
-                r.previousPrice = r.roundPrice;
-                r.roundPrice = newPrice * EXCHANGE_PRICE_MULTIPLIER;
-                r.roundSellVolume = asset(0, r.roundSellVolume.symbol);
-              });
-						}
-					}
-					else {
-						
-						// milestone vote failed
-						// wait for some time for founder to return funds or start extend voting
-						campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-							r.status = Status::waiting;
-							r.waitingEndTimestamp = now + WAITING_TIME;
-						});
-					}
-					
-				  DONE(1)
-				}
-			}
-			else {
-				_startvote(campaignItem.campaignId, VoteKind::milestoneResult);
-			}
-			
-			PASS 
-		}
+    V_CHECK(_extendDeadlineVoting)
+    
+		V_CHECK(_milestoneVoting)
+		
 		PASS
   } // PARAM _voting
   
-  #define _CHECK(x) tie(t, action) = (x)(campaignItem, campaigns); if (action == RefreshAction::pass) {} else if (action == RefreshAction::doneT) { DONE(t) } else if (action == RefreshAction::done) { DONE_ } else if (action == RefreshAction::skip) { SKIP }
+  PARAM _extendDeadlineVoting(const voting& votingItem, const campaigns& campaignItem, campaigns_i& campaigns) {
+		auto now = time_ms();
+		milestones_i milestones(_self, campaignItem.campaignId);
+		auto milestoneId = campaignItem.currentMilestone;
+		auto currentMilestoneItem = milestones.find(milestoneId);
+		
+		if (!votingItem.active ||
+      votingItem.milestoneId != milestoneId ||
+      votingItem.kind != VoteKind::extendDeadline) {
+      
+      PASS
+    }
+
+		// extend voting should be over
+		if (votingItem.endTimestamp > now && votingItem.voters != campaignItem.backersCount) {
+      PASS
+		}
+			
+		// stop it
+		_stopvote(campaignItem.campaignId);
+
+		// calculate decision
+		if (votingItem.positiveWeight >= get_percent(votingItem.votedWeight, T1)) {
+
+			// to-do test and complete
+
+			// extend all subsequent deadlines
+			for (auto& milestoneItem: milestones) {
+				if (milestoneItem.deadline >= currentMilestoneItem->deadline) {
+					milestones.modify(milestoneItem, same_payer, [&](auto& r) {
+						r.deadline += TIMET;
+					});
+				}
+			}
+
+			// go back to milestone
+			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+				r.status = Status::milestone;
+			});
+			
+			// to-do correct timers?
+		}
+	
+		DONE(1)
+	  
+  } // PARAM _extendDeadlineVoting
+  
+  PARAM _milestoneVoting(const voting& votingItem, const campaigns& campaignItem, campaigns_i& campaigns) {
+    auto now = time_ms();
+		milestones_i milestones(_self, campaignItem.campaignId);
+		auto milestoneId = campaignItem.currentMilestone;
+		auto currentMilestoneItem = milestones.find(milestoneId);
+		
+    // milestone is not over yet 
+    if (currentMilestoneItem->deadline > now) {
+      PASS  
+    }
+		
+		// voting is not active
+    if (!votingItem.active ||
+        votingItem.milestoneId != milestoneId ||
+        votingItem.kind != VoteKind::milestoneResult) {
+	      
+      _startvote(campaignItem.campaignId, VoteKind::milestoneResult);
+      DONE(1)
+	  }
+		
+		// milestone voting is not over yet
+		if (votingItem.endTimestamp > now || votingItem.voters != campaignItem.backersCount) {
+		  PASS  
+		}
+		
+		// milestone voting complete
+		_stopvote(campaignItem.campaignId);
+		
+		// if failed, change state and return 
+		if (votingItem.positiveWeight < get_percent(votingItem.votedWeight, T1)) {
+		  
+			// milestone vote failed
+			// wait for some time for founder to return funds or start extend voting
+			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+				r.status = Status::waiting;
+				r.waitingEndTimestamp = now + WAITING_TIME;
+			});
+			
+			DONE(1)
+		}
+			
+		// milestone voting success 
+		
+		// release this part of funds 
+		auto percent = get_percent(campaignItem.raised.amount, 
+									 currentMilestoneItem->fundsReleasePercent);
+		auto quantity = campaignItem.raised;
+		quantity.amount = percent;
+		_transfer(campaignItem.founderEosAccount, quantity, "ScrugeX: Milestone Payment");
+		
+		campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+			r.releasedPercent += currentMilestoneItem->fundsReleasePercent;
+		});
+
+		// get next milestone
+		uint64_t nextMilestoneId = campaignItem.currentMilestone + 1;
+		auto nextMilestoneItem = milestones.find(nextMilestoneId);
+
+		if (nextMilestoneItem == milestones.end()) {
+
+			// no more milestones
+			// start distributing tokens
+			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+				r.status = Status::distributing;
+			});
+			
+			_schedulePay(campaignItem.campaignId);
+		}
+		else {
+			
+			// switch milestone
+			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+				r.currentMilestone = nextMilestoneId;
+				r.status = Status::milestone;
+			});
+			
+			// enable exchange 
+			_startExchange(campaignItem.campaignId, nextMilestoneId);
+		}
+		
+	  DONE(1)
+		
+  } // PARAM _milestoneVoting
+  
+  #define X_CHECK(x) tie(t, action) = (x)(campaignItem, campaigns); if (action == RefreshAction::pass) {} else if (action == RefreshAction::doneT) { DONE(t) } else if (action == RefreshAction::done) { DONE_ } else if (action == RefreshAction::skip) { SKIP }
 
   PARAM _runExchange(const campaigns& campaignItem, campaigns_i& campaigns) {
-    uint64_t t = 0, nextRefreshTime = REFRESH_PERIOD;
-	  RefreshAction action;
+    INIT
 
     exchangeinfo_i exchangeinfo(_self, campaignItem.campaignId);
     auto exchangeItem = exchangeinfo.begin();
     
     if (exchangeItem->status != ExchangeStatus::inactive) {
       
-      _CHECK(_closeSell)
+      X_CHECK(_closeSell)
       
-      _CHECK(_canClose)
+      X_CHECK(_canClose)
     }
+    
     PASS
+
   } // PARAM _runExchange
   
   PARAM _closeSell(const campaigns& campaignItem, campaigns_i& campaigns) {
