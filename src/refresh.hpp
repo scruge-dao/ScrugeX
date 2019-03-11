@@ -394,9 +394,11 @@ param _canClose(const campaigns& campaignItem, campaigns_i& campaigns) {
       DONE(0)
     }
     
-    DONE_
+    PASS
   }
+  
   PASS
+  
 } // PARAM _canClose
 
 void scrugex::refresh() {
