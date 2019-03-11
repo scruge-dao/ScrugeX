@@ -44,7 +44,7 @@ public:
 	
 	// exchange
 	
-	ACTION buy(name eosAccount, uint64_t campaignId, asset quantity, asset price);
+	ACTION buy(name eosAccount, uint64_t campaignId, asset quantity, asset sum);
 	
 	ACTION sell(name eosAccount, uint64_t campaignId, asset quantity);
 
