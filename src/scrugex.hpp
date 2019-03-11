@@ -9,6 +9,9 @@
 using namespace eosio;
 using namespace std;
 
+#define PRINT(x, y) eosio::print(x); eosio::print(y); eosio::print("\n");
+#define PRINT_(x) eosio::print(x); eosio::print("\n");
+
 CONTRACT scrugex : public contract {
 
 public:
@@ -541,5 +544,256 @@ private:
 
 	typedef multi_index<"accounts"_n, account,
 		indexed_by<"identifier"_n, const_mem_fun<account, uint64_t,
-											&account::identifier>>> accounts_i;
-};
+      &account::identifier>>> accounts_i;
+  
+	
+  
+  // refresh cycle 
+  
+  enum RefreshAction: uint8_t { doneT = 0, done = 1, skip = 2, pass = 3 };
+  typedef tuple<uint64_t, RefreshAction> PARAM;
+  #define PASS return make_tuple(0, RefreshAction::pass);
+  #define SKIP return make_tuple(0, RefreshAction::skip);
+  #define DONE_ return make_tuple(0, RefreshAction::done);
+  #define DONE(x) return make_tuple((x), RefreshAction::doneT);
+  
+  PARAM _campaignOver(const campaigns& campaignItem, campaigns_i& campaigns) {
+    if (time_ms() < campaignItem.endTimestamp || campaignItem.active == false) {
+			SKIP
+		}
+		PASS 
+  } // PARAM _campaignOver
+  
+  PARAM _fundingComplete(const campaigns& campaignItem, campaigns_i& campaigns) {
+    if (campaignItem.status == Status::funding) {
+		
+  		// did not reach soft cap, refund all money
+  		if (campaignItem.raised < campaignItem.softCap) {
+  		
+  			_refund(campaignItem.campaignId);
+  
+  			// don't schedule refresh if a campaign is refunding
+  			DONE(0)
+  		}
+  		else if (campaignItem.raised > campaignItem.hardCap) {  
+  			
+  			// if will refund, don't run refresh again
+  			bool willRefund = _willRefundExcessiveFunds(campaignItem.campaignId);
+  			DONE(willRefund ? 0 : 1)
+  		}
+  		
+  		// release initial funds
+  		auto quantity = get_percent(campaignItem.raised, campaignItem.initialFundsReleasePercent);
+  		_transfer(campaignItem.founderEosAccount, quantity, "ScrugeX: Initial Funds");
+  
+  		// start milestones
+  		campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+  			r.releasedPercent += campaignItem.initialFundsReleasePercent;
+  			r.status = Status::milestone;
+  		});
+		
+  		DONE(1)
+	  }
+		PASS
+  } // PARAM _fundingComplete
+  
+  PARAM _waitingOver(const campaigns& campaignItem, campaigns_i& campaigns) {
+		if (campaignItem.status == Status::waiting && campaignItem.waitingEndTimestamp < time_ms()) {
+			_refund(campaignItem.campaignId);
+			DONE(1)
+		}
+		PASS 
+  } // PARAM _waitingOver
+  
+  PARAM _isRefunding(const campaigns& campaignItem, campaigns_i& campaigns) {
+		if (campaignItem.status == Status::refunding || 
+				campaignItem.status == Status::distributing ||
+				campaignItem.status == Status::excessReturning) {
+			_schedulePay(campaignItem.campaignId);
+			SKIP
+		}
+		PASS
+  } // PARAM _isRefunding
+  
+  #define _CHECK(x) tie(t, action) = (x)(campaignItem); if (action == RefreshAction::pass) {} else if (action == RefreshAction::doneT) { DONE(t) } else if (action == RefreshAction::done) { DONE_ } else if (action == RefreshAction::skip) { SKIP }
+
+  PARAM _runExchange(const campaigns& campaignItem, campaigns_i& campaigns) {
+    uint64_t t = 0, nextRefreshTime = REFRESH_PERIOD;
+	  RefreshAction action;
+
+    exchangeinfo_i exchangeinfo(_self, campaignItem.campaignId);
+    auto exchangeItem = exchangeinfo.begin();
+    
+    if (exchangeItem->status != ExchangeStatus::inactive) {
+      
+      _CHECK(_closeSell)
+      
+      _CHECK(_canClose)
+    }
+    PASS
+  } // PARAM _runExchange
+  
+  PARAM _closeSell(const campaigns& campaignItem) {
+    exchangeinfo_i exchangeinfo(_self, campaignItem.campaignId);
+    auto exchangeItem = exchangeinfo.begin();
+    
+    if (exchangeItem->status == ExchangeStatus::selling && exchangeItem->sellEndTimestamp < time_ms()) {
+      
+      PRINT_("exchange: sell phase ended")
+      
+      sellorders_i sellorders(_self, campaignItem.campaignId);
+      
+      auto newStatus = sellorders.begin() == sellorders.end() ? 
+        ExchangeStatus::inactive : ExchangeStatus::buying;
+        
+      exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
+        r.status = newStatus;
+      });
+      
+      DONE_
+    }
+    PASS 
+  } // PARAM _sellOver
+  
+  PARAM _canClose(const campaigns& campaignItem) {
+    campaigns_i campaigns(_self, _self.value);
+    exchangeinfo_i exchangeinfo(_self, campaignItem.campaignId);
+    auto exchangeItem = exchangeinfo.begin();
+    
+    if (exchangeItem->status == ExchangeStatus::buying) {
+      uint64_t now = time_ms();
+      
+      // lower auction price when needed
+      if (exchangeItem->priceTimestamp + EXCHANGE_PRICE_PERIOD < now) {
+        exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
+          r.priceTimestamp = now;
+          r.roundPrice /= 5; // to-do formula
+        });
+      }
+  
+      buyorders_i buyorders(_self, campaignItem.campaignId);
+      auto ordersByPrice = buyorders.get_index<"bypricedesc"_n>(); // to-do smart sort milestone -> price -> time
+      
+      auto sellVolume = exchangeItem->roundSellVolume.amount;
+      double roundPrice = (double)exchangeItem->roundPrice;
+      double pICO = (double)campaignItem.raised.amount / (double)campaignItem.supplyForSale.amount;
+      
+      vector<uint64_t> ids;
+      
+      for (auto& orderItem : ordersByPrice) {
+        
+        // process current exchange only
+        if (orderItem.milestoneId != exchangeItem->milestoneId) { continue; }
+        
+        // skip unpaid orders
+        if (!orderItem.paymentReceived) { continue; }
+        
+        if (orderItem.price < exchangeItem->roundPrice) { break; }
+        
+        uint64_t purchaseAmount = min(orderItem.quantity.amount, sellVolume);
+        sellVolume -= purchaseAmount;
+        
+        if (purchaseAmount > 0) {
+          
+          ids.push_back(orderItem.key);
+
+          double cost = (double)purchaseAmount * roundPrice;
+          
+          auto item = buyorders.find(orderItem.key);
+          buyorders.modify(item, same_payer, [&](auto& r) {
+            r.purchased = asset(purchaseAmount, r.purchased.symbol);
+            r.spent = cost;
+          });
+        }
+        else {
+          auto item = buyorders.find(orderItem.key);
+          buyorders.modify(item, same_payer, [&](auto& r) {
+            r.purchased = asset(0, r.purchased.symbol);
+            r.spent = 0;
+          });
+        }
+      }
+      
+      // closing exchange
+      if (sellVolume == 0) {
+        
+        PRINT_("exchange: exchange closed")
+        
+        for (auto& id : ids) {
+          auto orderItem = buyorders.find(id);
+          
+          contributions_i contributions(_self, campaignItem.campaignId);
+          auto contributionItem = contributions.find(orderItem->userId);
+          auto spent = (uint64_t) floor(orderItem->spent);
+          
+          if (contributionItem == contributions.end()) {
+            campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+              r.backersCount += 1;
+            });
+            
+            contributions.emplace(_self, [&](auto& r) {
+              r.userId = orderItem->userId;
+          		r.eosAccount = orderItem->eosAccount;
+          		r.quantity = asset(spent, orderItem->sum.symbol);
+          		r.attemptedPayment = false;
+          		r.isPaid = false;
+            });
+          }
+          else {
+            contributions.modify(contributionItem, same_payer, [&](auto& r) {
+              r.quantity -= asset(spent, r.quantity.symbol);
+            });
+          }
+        }
+        
+        sellorders_i sellorders(_self, campaignItem.campaignId);
+        for (auto& orderItem : sellorders) {
+          
+          // process this exchange only
+          if (orderItem.milestoneId != exchangeItem->milestoneId) {
+            continue;
+          }
+          
+          contributions_i contributions(_self, campaignItem.campaignId);
+          auto contributionItem = contributions.find(orderItem.userId);
+          
+          uint64_t cost = (uint64_t) floor((double)orderItem.quantity.amount * min(roundPrice, pICO));
+          sellorders.modify(orderItem, same_payer, [&](auto& r) {
+            r.received = asset(cost, r.received.symbol);
+          });
+          
+          if (contributionItem->quantity.amount == cost) {
+            campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+              r.backersCount -= 1;
+            });
+            
+            contributions.erase(contributionItem);
+          }
+          else {
+            contributions.modify(contributionItem, same_payer, [&](auto& r) {
+              r.quantity -= asset(cost, r.quantity.symbol);
+            });
+          }
+        }
+        
+        // close exchange
+        
+        double diff = roundPrice - pICO;
+        uint64_t fundAmount = (uint64_t) floor((double)exchangeItem->roundSellVolume.amount * diff);
+          
+        exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
+          r.investorsFund += asset(fundAmount, r.investorsFund.symbol);
+          r.status = ExchangeStatus::inactive;
+        });
+        
+        _schedulePay(campaignItem.campaignId);
+        
+        DONE(0)
+      }
+      
+      DONE_
+    }
+    PASS
+  } // PARAM _canClose
+  
+}; // CONTRACT scrugex

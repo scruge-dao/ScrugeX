@@ -1,235 +1,26 @@
+#define CHECK(x) tie(t, action) = (x)(campaignItem, campaigns); if (action == RefreshAction::pass) {} else if (action == RefreshAction::doneT) { nextRefreshTime = t; break; } else if (action == RefreshAction::done) { break; } else if (action == RefreshAction::skip) { continue; }
+
 void scrugex::refresh() {
 	require_auth(_self);
 
 	auto now = time_ms();
 	campaigns_i campaigns(_self, _self.value);
 	
-	// refresh again in x minutes if nothing else turns up
-	uint64_t nextRefreshTime = REFRESH_PERIOD;
+	uint64_t t = 0, nextRefreshTime = REFRESH_PERIOD;
+	RefreshAction action;
 
 	for (auto& campaignItem: campaigns) {
 
-		if (now < campaignItem.endTimestamp || campaignItem.active == false) {
-			continue;
-		}
+		CHECK(_campaignOver)
 		
-		// funding is complete
-		if (campaignItem.status == Status::funding) {
-			
-			// did not reach soft cap, refund all money
-			if (campaignItem.raised < campaignItem.softCap) {
-			
-				_refund(campaignItem.campaignId);
-
-				// don't schedule refresh if a campaign is refunding
-				nextRefreshTime = 0;
-				break;
-			}
-			else if (campaignItem.raised > campaignItem.hardCap) {  
-				
-				if (_willRefundExcessiveFunds(campaignItem.campaignId)) {
-					// payout process is launched
-					nextRefreshTime = 0;
-				}
-				else {
-					// wait for next refresh cycle to continue setup below
-					nextRefreshTime = 1;
-				}
-
-				break;
-			}
-			
-			// release initial funds
-			auto quantity = get_percent(campaignItem.raised, campaignItem.initialFundsReleasePercent);
-			_transfer(campaignItem.founderEosAccount, quantity, "ScrugeX: Initial Funds");
-
-			// start milestones
-			campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-				r.releasedPercent += campaignItem.initialFundsReleasePercent;
-				r.status = Status::milestone;
-			});
-			
-			nextRefreshTime = 1;
-			break;
-		}
+		CHECK(_fundingComplete)
 		
-		// check if waiting time has passed
-		if (campaignItem.status == Status::waiting && campaignItem.waitingEndTimestamp < now) {
-			// founder failed to act, refunding
-			_refund(campaignItem.campaignId);
-			nextRefreshTime = 0;
-			break;
-		}
+		CHECK(_waitingOver)
 
-		// check if supposed to be refunding
-		if (campaignItem.status == Status::refunding || 
-				campaignItem.status == Status::distributing ||
-				campaignItem.status == Status::excessReturning) {
-
-			_schedulePay(campaignItem.campaignId);
-			nextRefreshTime = 0;
-			continue;
-		}
+    CHECK(_isRefunding)
     
-    // check exchange
-    exchangeinfo_i exchangeinfo(_self, campaignItem.campaignId);
-    auto exchangeItem = exchangeinfo.begin();
+    CHECK(_runExchange)
     
-    if (exchangeItem->status != ExchangeStatus::inactive) {
-      
-      // exchange sell period is over 
-      if (exchangeItem->status == ExchangeStatus::selling && exchangeItem->sellEndTimestamp < now) {
-      
-        sellorders_i sellorders(_self, campaignItem.campaignId);
-      
-        //close exchange if no orders exist
-        auto newStatus = sellorders.begin() == sellorders.end() ? 
-            ExchangeStatus::inactive : ExchangeStatus::buying;
-        
-        exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
-          r.status = newStatus;
-        });
-        
-        break;
-      }
-      
-      if (exchangeItem->status == ExchangeStatus::buying) {
-        
-        // lower auction price when needed
-        if (exchangeItem->priceTimestamp + EXCHANGE_PRICE_PERIOD < now) {
-          exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
-            r.priceTimestamp = now;
-            r.roundPrice /= 5; // to-do formula
-          });
-        }
-        
-        // check if should close because of price threshold
-        
-        buyorders_i buyorders(_self, campaignItem.campaignId);
-        auto ordersByPrice = buyorders.get_index<"bypricedesc"_n>(); // to-do smart sort milestone -> price -> time
-        
-        auto sellVolume = exchangeItem->roundSellVolume.amount;
-        double roundPrice = (double)exchangeItem->roundPrice;
-        double pICO = (double)campaignItem.raised.amount / (double)campaignItem.supplyForSale.amount;
-        
-        vector<uint64_t> ids;
-        
-        for (auto& orderItem : ordersByPrice) {
-          
-          // process current exchange only
-          if (orderItem.milestoneId != exchangeItem->milestoneId) {
-            continue;
-          }
-          
-          // skip unpaid orders
-          if (!orderItem.paymentReceived) { continue; }
-          
-          if (orderItem.price < exchangeItem->roundPrice) {
-            break;
-          }
-          
-          uint64_t purchaseAmount = min(orderItem.quantity.amount, sellVolume);
-          sellVolume -= purchaseAmount;
-          
-          if (purchaseAmount > 0) {
-            
-            ids.push_back(orderItem.key);
-            
-            double cost = (double)purchaseAmount * roundPrice;
-            
-            auto item = buyorders.find(orderItem.key);
-            buyorders.modify(item, same_payer, [&](auto& r) {
-              r.purchased = asset(purchaseAmount, r.purchased.symbol);
-              r.spent = cost;
-            });
-          }
-          else {
-            auto item = buyorders.find(orderItem.key);
-            buyorders.modify(item, same_payer, [&](auto& r) {
-              r.purchased = asset(0, r.purchased.symbol);
-              r.spent = 0;
-            });
-          }
-        }
-        
-        
-        // closing exchange
-        if (sellVolume == 0) {
-          for (auto& id : ids) {
-            auto orderItem = buyorders.find(id);
-            
-            contributions_i contributions(_self, campaignItem.campaignId);
-            auto contributionItem = contributions.find(orderItem->userId);
-            auto spent = (uint64_t) floor(orderItem->spent);
-            
-            if (contributionItem == contributions.end()) {
-              campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-                r.backersCount += 1;
-              });
-              
-              contributions.emplace(_self, [&](auto& r) {
-                r.userId = orderItem->userId;
-            		r.eosAccount = orderItem->eosAccount;
-            		r.quantity = asset(spent, orderItem->sum.symbol);
-            		r.attemptedPayment = false;
-            		r.isPaid = false;
-              });
-            }
-            else {
-              contributions.modify(contributionItem, same_payer, [&](auto& r) {
-                r.quantity -= asset(spent, r.quantity.symbol);
-              });
-            }
-          }
-          
-          sellorders_i sellorders(_self, campaignItem.campaignId);
-          for (auto& orderItem : sellorders) {
-            
-            // process this exchange only
-            if (orderItem.milestoneId != exchangeItem->milestoneId) {
-              continue;
-            }
-            
-            contributions_i contributions(_self, campaignItem.campaignId);
-            auto contributionItem = contributions.find(orderItem.userId);
-            
-            uint64_t cost = (uint64_t) floor((double)orderItem.quantity.amount * min(roundPrice, pICO));
-            sellorders.modify(orderItem, same_payer, [&](auto& r) {
-              r.received = asset(cost, r.received.symbol);
-            });
-            
-            if (contributionItem->quantity.amount == cost) {
-              campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-                r.backersCount -= 1;
-              });
-              
-              contributions.erase(contributionItem);
-            }
-            else {
-              contributions.modify(contributionItem, same_payer, [&](auto& r) {
-                r.quantity -= asset(cost, r.quantity.symbol);
-              });
-            }
-          }
-          
-          // close exchange
-          
-          double diff = roundPrice - pICO;
-          uint64_t fundAmount = (uint64_t) floor((double)exchangeItem->roundSellVolume.amount * diff);
-            
-          exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
-            r.investorsFund += asset(fundAmount, r.investorsFund.symbol);
-            r.status = ExchangeStatus::inactive;
-          });
-          
-          _schedulePay(campaignItem.campaignId);
-          nextRefreshTime = 0;
-        }
-        
-        break;
-      }
-    }
-  
 		// check for ongoing voting
 
 		auto scope = campaignItem.campaignId;
