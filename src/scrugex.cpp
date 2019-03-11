@@ -1,6 +1,7 @@
 #include "scrugex.hpp"
-#include "refresh.hpp"
 #include "debug.hpp"
+#include "refresh.hpp"
+#include "helper.hpp"
 
 void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	if (to != _self) { return; }
