@@ -21,30 +21,19 @@ public:
 	void transfer(name from, name to, asset quantity, string memo);
 
 	ACTION newcampaign(name founderEosAccount, asset softCap, asset hardCap, 
-	asset supplyForSale, name tokenContract, uint64_t initialFundsReleasePercent, bool kycEnabled,
+	  asset supplyForSale, name tokenContract, uint64_t initialFundsReleasePercent, bool kycEnabled,
 		uint64_t maxUserContributionPercent, uint64_t minUserContributionPercent,
 		uint64_t startTimestamp, uint64_t endTimestamp, vector<milestoneInfo> milestones);
 
 	ACTION vote(name eosAccount, uint64_t campaignId, bool vote);
-
 	ACTION extend(uint64_t campaignId);
-	
 	ACTION refund(uint64_t campaignId);
-
 	ACTION refresh();
-
 	ACTION destroy();
-
 	ACTION send(name eosAccount, uint64_t campaignId);
-	
 	ACTION take(name eosAccount, uint64_t campaignId);
-
 	ACTION pay(uint64_t campaignId);
-	
-	// exchange
-	
 	ACTION buy(name eosAccount, uint64_t campaignId, asset quantity, asset sum);
-	
 	ACTION sell(name eosAccount, uint64_t campaignId, asset quantity);
 
 private:
@@ -285,16 +274,16 @@ private:
 
   // refresh cycle methods
   enum RefreshAction: uint8_t { doneT = 0, done = 1, skip = 2, pass = 3 };
-  typedef tuple<uint64_t, RefreshAction> PARAM;
-  PARAM _fundingComplete(const campaigns& campaignItem, campaigns_i& campaigns);
-  PARAM _campaignOver(const campaigns& campaignItem, campaigns_i& campaigns);
-  PARAM _waitingOver(const campaigns& campaignItem, campaigns_i& campaigns);
-  PARAM _isRefunding(const campaigns& campaignItem, campaigns_i& campaigns);
-  PARAM _voting(const campaigns& campaignItem, campaigns_i& campaigns);
-  PARAM _extendDeadlineVoting(const voting& votingItem, const campaigns& campaignItem, campaigns_i& campaigns);
-  PARAM _milestoneVoting(const voting& votingItem, const campaigns& campaignItem, campaigns_i& campaigns);
-  PARAM _runExchange(const campaigns& campaignItem, campaigns_i& campaigns);
-  PARAM _closeSell(const campaigns& campaignItem, campaigns_i& campaigns);
-  PARAM _canClose(const campaigns& campaignItem, campaigns_i& campaigns);
+  typedef tuple<uint64_t, RefreshAction> param;
+  param _campaignFunding(const campaigns& campaignItem, campaigns_i& campaigns);
+  param _initialRelease(const campaigns& campaignItem, campaigns_i& campaigns);
+  param _waiting(const campaigns& campaignItem, campaigns_i& campaigns);
+  param _refunding(const campaigns& campaignItem, campaigns_i& campaigns);
+  param _voting(const campaigns& campaignItem, campaigns_i& campaigns);
+  param _extendDeadlineVoting(const voting& votingItem, const campaigns& campaignItem, campaigns_i& campaigns);
+  param _milestoneVoting(const voting& votingItem, const campaigns& campaignItem, campaigns_i& campaigns);
+  param _runExchange(const campaigns& campaignItem, campaigns_i& campaigns);
+  param _closeSell(const campaigns& campaignItem, campaigns_i& campaigns);
+  param _canClose(const campaigns& campaignItem, campaigns_i& campaigns);
   
 }; // CONTRACT scrugex

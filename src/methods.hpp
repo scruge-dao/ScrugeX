@@ -5,7 +5,7 @@
 using namespace eosio;
 using namespace std;
 
-#define PRINT(x, y) eosio::print(x); eosio::print(y); eosio::print("\n");
+#define PRINT(x, y) eosio::print(x); eosio::print(": "); eosio::print(y); eosio::print("\n");
 #define PRINT_(x) eosio::print(x); eosio::print("\n");
 
 // METHODS

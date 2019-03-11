@@ -1,21 +1,22 @@
 #define PASS return make_tuple(0, RefreshAction::pass);
-#define SKIP return make_tuple(0, RefreshAction::skip);
-#define DONE_ return make_tuple(0, RefreshAction::done);
-#define DONE(x) return make_tuple((x), RefreshAction::doneT);
+#define SKIP PRINT_("SKIP") return make_tuple(0, RefreshAction::skip);
+#define DONE_ PRINT_("DONE_") return make_tuple(0, RefreshAction::done);
+#define DONE(x) PRINT("DONE", x) return make_tuple((x), RefreshAction::doneT);
+
 #define INIT uint64_t t = 0, nextRefreshTime = REFRESH_PERIOD; RefreshAction action;
 #define R_CHECK(x) tie(t, action) = (x)(campaignItem, campaigns); if (action == RefreshAction::pass) {} else if (action == RefreshAction::doneT) { nextRefreshTime = t; break; } else if (action == RefreshAction::done) { break; } else if (action == RefreshAction::skip) { continue; }
 #define V_CHECK(x) tie(t, action) = (x)(*votingItem, campaignItem, campaigns); if (action == RefreshAction::pass) {} else if (action == RefreshAction::doneT) { DONE(t) } else if (action == RefreshAction::done) { DONE_ } else if (action == RefreshAction::skip) { SKIP }
 #define X_CHECK(x) tie(t, action) = (x)(campaignItem, campaigns); if (action == RefreshAction::pass) {} else if (action == RefreshAction::doneT) { DONE(t) } else if (action == RefreshAction::done) { DONE_ } else if (action == RefreshAction::skip) { SKIP }
-#define METHOD scrugex::PARAM scrugex::
+#define param scrugex::param scrugex::
 
-METHOD _campaignOver(const campaigns& campaignItem, campaigns_i& campaigns) {
+param _campaignFunding(const campaigns& campaignItem, campaigns_i& campaigns) {
   if (time_ms() < campaignItem.endTimestamp || campaignItem.active == false) {
 		SKIP
 	}
 	PASS 
 } // PARAM _campaignOver
 
-METHOD _fundingComplete(const campaigns& campaignItem, campaigns_i& campaigns) {
+param _initialRelease(const campaigns& campaignItem, campaigns_i& campaigns) {
   if (campaignItem.status == Status::funding) {
 	
 		// did not reach soft cap, refund all money
@@ -48,7 +49,7 @@ METHOD _fundingComplete(const campaigns& campaignItem, campaigns_i& campaigns) {
 	PASS
 } // PARAM _fundingComplete
 
-METHOD _waitingOver(const campaigns& campaignItem, campaigns_i& campaigns) {
+param _waiting(const campaigns& campaignItem, campaigns_i& campaigns) {
 	if (campaignItem.status == Status::waiting && campaignItem.waitingEndTimestamp < time_ms()) {
 		_refund(campaignItem.campaignId);
 		DONE(1)
@@ -56,7 +57,7 @@ METHOD _waitingOver(const campaigns& campaignItem, campaigns_i& campaigns) {
 	PASS 
 } // PARAM _waitingOver
 
-METHOD _isRefunding(const campaigns& campaignItem, campaigns_i& campaigns) {
+param _refunding(const campaigns& campaignItem, campaigns_i& campaigns) {
 	if (campaignItem.status == Status::refunding || 
 			campaignItem.status == Status::distributing ||
 			campaignItem.status == Status::excessReturning) {
@@ -68,21 +69,23 @@ METHOD _isRefunding(const campaigns& campaignItem, campaigns_i& campaigns) {
 
 // VOTING 
 
-METHOD _voting(const campaigns& campaignItem, campaigns_i& campaigns) {
+param _voting(const campaigns& campaignItem, campaigns_i& campaigns) {
   INIT
   
 	voting_i voting(_self, campaignItem.campaignId);
   auto activeVoting = voting.get_index<"byactive"_n>();
   auto votingItem = activeVoting.begin();
   
+  PRINT_("_extendDeadlineVoting")
   V_CHECK(_extendDeadlineVoting)
   
+  PRINT_("_milestoneVoting")
 	V_CHECK(_milestoneVoting)
 	
 	PASS
 } // PARAM _voting
 
-METHOD _extendDeadlineVoting(const voting& votingItem, const campaigns& campaignItem, campaigns_i& campaigns) {
+param _extendDeadlineVoting(const voting& votingItem, const campaigns& campaignItem, campaigns_i& campaigns) {
 	auto now = time_ms();
 	milestones_i milestones(_self, campaignItem.campaignId);
 	auto milestoneId = campaignItem.currentMilestone;
@@ -129,28 +132,28 @@ METHOD _extendDeadlineVoting(const voting& votingItem, const campaigns& campaign
   
 } // PARAM _extendDeadlineVoting
 
-METHOD _milestoneVoting(const voting& votingItem, const campaigns& campaignItem, campaigns_i& campaigns) {
+param _milestoneVoting(const voting& votingItem, const campaigns& campaignItem, campaigns_i& campaigns) {
   auto now = time_ms();
 	milestones_i milestones(_self, campaignItem.campaignId);
 	auto milestoneId = campaignItem.currentMilestone;
 	auto currentMilestoneItem = milestones.find(milestoneId);
 	
-  // milestone is not over yet 
+  // milestone is not over yet
   if (currentMilestoneItem->deadline > now) {
-    PASS  
+    PASS
   }
 	
 	// voting is not active
   if (!votingItem.active ||
       votingItem.milestoneId != milestoneId ||
       votingItem.kind != VoteKind::milestoneResult) {
-      
+    
     _startvote(campaignItem.campaignId, VoteKind::milestoneResult);
     DONE(1)
   }
 	
 	// milestone voting is not over yet
-	if (votingItem.endTimestamp > now || votingItem.voters != campaignItem.backersCount) {
+	if (votingItem.endTimestamp > now && votingItem.voters != campaignItem.backersCount) {
 	  PASS  
 	}
 	
@@ -215,7 +218,7 @@ METHOD _milestoneVoting(const voting& votingItem, const campaigns& campaignItem,
 
 // EXCHANGE
 
-METHOD _runExchange(const campaigns& campaignItem, campaigns_i& campaigns) {
+param _runExchange(const campaigns& campaignItem, campaigns_i& campaigns) {
   INIT
 
   exchangeinfo_i exchangeinfo(_self, campaignItem.campaignId);
@@ -223,8 +226,10 @@ METHOD _runExchange(const campaigns& campaignItem, campaigns_i& campaigns) {
   
   if (exchangeItem->status != ExchangeStatus::inactive) {
     
+    PRINT_("_closeSell")
     X_CHECK(_closeSell)
     
+    PRINT_("_canClose")
     X_CHECK(_canClose)
   }
   
@@ -232,7 +237,7 @@ METHOD _runExchange(const campaigns& campaignItem, campaigns_i& campaigns) {
 
 } // PARAM _runExchange
 
-METHOD _closeSell(const campaigns& campaignItem, campaigns_i& campaigns) {
+param _closeSell(const campaigns& campaignItem, campaigns_i& campaigns) {
   exchangeinfo_i exchangeinfo(_self, campaignItem.campaignId);
   auto exchangeItem = exchangeinfo.begin();
   
@@ -254,7 +259,7 @@ METHOD _closeSell(const campaigns& campaignItem, campaigns_i& campaigns) {
   PASS 
 } // PARAM _sellOver
 
-METHOD _canClose(const campaigns& campaignItem, campaigns_i& campaigns) {
+param _canClose(const campaigns& campaignItem, campaigns_i& campaigns) {
   exchangeinfo_i exchangeinfo(_self, campaignItem.campaignId);
   auto exchangeItem = exchangeinfo.begin();
   
@@ -402,13 +407,17 @@ void scrugex::refresh() {
 	campaigns_i campaigns(_self, _self.value);
 	for (auto& campaignItem: campaigns) {
 
-		R_CHECK(_campaignOver)
+    PRINT_("_campaignFunding")
+		R_CHECK(_campaignFunding)
 		
-		R_CHECK(_fundingComplete)
+		PRINT_("_initialRelease")
+		R_CHECK(_initialRelease)
 		
-		R_CHECK(_waitingOver)
+		PRINT_("_waiting")
+		R_CHECK(_waiting)
 
-    R_CHECK(_isRefunding)
+    PRINT_("_refunding")
+    R_CHECK(_refunding)
     
     R_CHECK(_runExchange)
     
