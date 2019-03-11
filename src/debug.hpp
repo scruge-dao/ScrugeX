@@ -1,6 +1,3 @@
-#define PRINT(x, y) eosio::print(x); eosio::print(y); eosio::print("\n");
-#define PRINT_(x) eosio::print(x); eosio::print("\n");
-
 // methods for debug purposes
 
 void scrugex::destroy() {
