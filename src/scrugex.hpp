@@ -1,4 +1,3 @@
-#pragma once
 #include <cmath>
 #include <eosiolib/transaction.hpp>
 #include <eosiolib/asset.hpp>
@@ -221,13 +220,11 @@ private:
 		eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 		eosio_assert(campaignItem->active, "campaign is no longer active");
 
-		auto scope = campaignItem->campaignId;
-
-		milestones_i milestones(_self, scope);
+		milestones_i milestones(_self, campaignItem->campaignId);
 		auto milestoneId = campaignItem->currentMilestone;
 
 		// create a voting record
-		voting_i voting(_self, scope);
+		voting_i voting(_self, campaignItem->campaignId);
 		
 		auto votingItem = voting.begin();
 		while (votingItem != voting.end()) {
@@ -248,14 +245,12 @@ private:
 		eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 		eosio_assert(campaignItem->active, "campaign is no longer active");
 
-		auto scope = campaignItem->campaignId;
-
 		// get current milestone
-		milestones_i milestones(_self, scope);
+		milestones_i milestones(_self, campaignItem->campaignId);
 		auto milestoneId = campaignItem->currentMilestone;
 
 		// create a voting record
-		voting_i voting(_self, scope);
+		voting_i voting(_self, campaignItem->campaignId);
 
 		// check if this/other vote exists for this milestone
 		auto voteId = milestoneId * 100 + kind;
@@ -268,7 +263,7 @@ private:
 		auto end = now + VOTING_DURATION;
 
 		// delete voters from previous voting
-		voters_i voters(_self, scope);
+		voters_i voters(_self, campaignItem->campaignId);
 		auto v_item = voters.begin();
 		while(v_item != voters.end()) { v_item = voters.erase(v_item); }
 
@@ -331,7 +326,7 @@ private:
 	} // uint64_t _getCampaignsCount
 
   // to-do optimize
-	asset _getContributionQuantity(int64_t scope, uint64_t userId) {
+	asset _getContributionQuantity(uint64_t scope, uint64_t userId) {
 		contributions_i contributions(_self, scope);
 		asset total = asset(0, EOS_SYMBOL); // use investment symbol
 		for (auto& item : contributions) {
@@ -614,6 +609,159 @@ private:
 		}
 		PASS
   } // PARAM _isRefunding
+  
+  PARAM _voting(const campaigns& campaignItem, campaigns_i& campaigns) {
+    uint64_t nextRefreshTime = REFRESH_PERIOD;
+    
+		milestones_i milestones(_self, campaignItem.campaignId);
+		auto milestoneId = campaignItem.currentMilestone;
+		auto currentMilestoneItem = milestones.find(milestoneId);
+		voting_i voting(_self, campaignItem.campaignId);
+
+		for (auto& votingItem: voting) {
+			
+			// to-do improve search for active voting
+		
+			// check extend deadline votings
+			if (votingItem.milestoneId == milestoneId && votingItem.active &&
+				votingItem.kind == VoteKind::extendDeadline) {
+
+				// extend voting should be over
+				if (votingItem.endTimestamp < now || votingItem.voters == campaignItem.backersCount) {
+					
+					// stop it
+					_stopvote(campaignItem.campaignId);
+
+					// calculate decision
+					if (votingItem.positiveWeight >= get_percent(votingItem.votedWeight, T1)) {
+
+						// to-do test and complete
+
+						// extend all subsequent deadlines
+						for (auto& milestoneItem: milestones) {
+							if (milestoneItem.deadline >= currentMilestoneItem->deadline) {
+								milestones.modify(milestoneItem, same_payer, [&](auto& r) {
+									r.deadline += TIMET;
+								});
+							}
+						}
+
+						// go back to milestone
+						campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+							r.status = Status::milestone;
+						});
+						
+						// to-do correct timers?
+					}
+				
+					nextRefreshTime = 1;
+				}
+
+				break;
+			}
+		}
+
+		if (currentMilestoneItem->deadline < now) {
+			
+			// will start voting unless told not to 
+			bool shouldStartNextMilestoneVoting = true;
+			
+			// find ongoing milstone voting
+			for (auto& votingItem: voting) { // to-do improve search for active voting
+				if (votingItem.milestoneId == milestoneId && votingItem.active &&
+					votingItem.kind == VoteKind::milestoneResult) {
+
+					// vote has just ended, don't start another one
+					shouldStartNextMilestoneVoting = false;
+					
+					// milestone voting should be over  
+					if (votingItem.endTimestamp < now || votingItem.voters == campaignItem.backersCount) {
+						
+						// stop it
+						_stopvote(campaignItem.campaignId);
+						
+						// calculate decision
+						if (votingItem.positiveWeight >= get_percent(votingItem.votedWeight, T1)) {
+							
+							// milestone vote success
+							
+							// release this part of funds 
+							auto percent = get_percent(campaignItem.raised.amount, 
+														 currentMilestoneItem->fundsReleasePercent);
+							auto quantity = campaignItem.raised;
+							quantity.amount = percent;
+							_transfer(campaignItem.founderEosAccount, quantity, "ScrugeX: Milestone Payment");
+							
+							campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+								r.releasedPercent += currentMilestoneItem->fundsReleasePercent;
+							});
+
+							// get next milestone
+							uint64_t nextMilestoneId = campaignItem.currentMilestone + 1;
+							auto nextMilestoneItem = milestones.find(nextMilestoneId);
+
+							if (nextMilestoneItem == milestones.end()) {
+
+								// no more milestones
+								// start distributing tokens
+								campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+									r.status = Status::distributing;
+								});
+								
+								_schedulePay(campaignItem.campaignId);
+							}
+							else {
+								
+								// switch milestone
+								campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+									r.currentMilestone = nextMilestoneId;
+									r.status = Status::milestone;
+								});
+								
+								// enable exchange 
+								exchangeinfo_i exchangeinfo(_self, campaignItem.campaignId);
+								auto exchangeItem = exchangeinfo.begin();
+								
+								auto newPrice = exchangeItem->previousPrice;
+								if (newPrice == 0) {
+								  double pICO = (double)campaignItem.raised.amount / (double)campaignItem.supplyForSale.amount;
+								  newPrice = pICO * EXCHANGE_PRICE_MULTIPLIER;
+								}
+								
+                exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
+                  r.milestoneId = nextMilestoneId;
+                  r.status = ExchangeStatus::selling;
+                  r.sellEndTimestamp = now + EXCHANGE_SELL_DURATION;
+                  r.previousPrice = r.roundPrice;
+                  r.roundPrice = newPrice * EXCHANGE_PRICE_MULTIPLIER;
+                  r.roundSellVolume = asset(0, r.roundSellVolume.symbol);
+                });
+							}
+						}
+						else {
+							
+							// milestone vote failed
+							// wait for some time for founder to return funds or start extend voting
+							campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+								r.status = Status::waiting;
+								r.waitingEndTimestamp = now + WAITING_TIME;
+							});
+						}
+						
+						nextRefreshTime = 1;
+					}
+					
+					break;
+				}
+			}
+
+			if (shouldStartNextMilestoneVoting) {
+				_startvote(campaignItem.campaignId, VoteKind::milestoneResult);
+			}
+		}
+		
+		PASS
+  } // PARAM _voting
   
   #define _CHECK(x) tie(t, action) = (x)(campaignItem); if (action == RefreshAction::pass) {} else if (action == RefreshAction::doneT) { DONE(t) } else if (action == RefreshAction::done) { DONE_ } else if (action == RefreshAction::skip) { SKIP }
 
