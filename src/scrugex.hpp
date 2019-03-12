@@ -202,8 +202,22 @@ private:
     
 		uint64_t by_not_attempted_payment() const { return attemptedPayment ? 1 : 0; }
     
-    // to-do smart sort by milestone -> price -> timestamp 
-    uint64_t by_price() const { return numeric_limits<uint64_t>::max() - (uint64_t)(price * 1000000000.) ; } 
+    uint64_t special_index() const {
+      
+      // index: milestoneId -> price -> timestamp
+      // 19 digit number
+      // 1) 2 digits for milestone id
+      // 2) 13 digits for reverse price (keeping 3 digits before and 10 after decimal place)
+      // 4) 4 digits for reverse key
+
+      uint64_t A = 1000000000000000000;
+      uint64_t B = 10000000000;
+      uint64_t C = 10000;
+      
+      return milestoneId * A + 
+              A - (uint64_t)(price * (double)B) % (B * 1000) * C + 
+              C - key;
+    }
   };
 
 	// tables
@@ -236,7 +250,7 @@ private:
 		  > sellorders_i;
   
   typedef multi_index<"buyorders"_n, buyorders,
-    indexed_by<"bypricedesc"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_price>>,
+    indexed_by<"bypricedesc"_n, const_mem_fun<buyorders, uint64_t, &buyorders::special_index>>,
 		indexed_by<"byap"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_not_attempted_payment>>
       > buyorders_i;
 
