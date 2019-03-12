@@ -64,9 +64,9 @@ bool scrugex::_willRefundExcessiveFunds(uint64_t campaignId) {
 	auto campaignItem = campaigns.find(campaignId);
   eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 
-  uint64_t startSum = campaignItem->raised.amount;
-  uint64_t hardCap = campaignItem->hardCap.amount;
-  uint64_t softCap = campaignItem->softCap.amount;
+  auto startSum = campaignItem->raised;
+  auto hardCap = campaignItem->hardCap;
+  auto softCap = campaignItem->softCap;
 	
 	contributions_i contributions(_self, campaignId);
 	auto sortedContributions = contributions.get_index<"byamountdesc"_n>();
@@ -75,21 +75,22 @@ bool scrugex::_willRefundExcessiveFunds(uint64_t campaignId) {
   if (startSum > hardCap) {
   	
     uint64_t backersCount = campaignItem->backersCount;
-    uint64_t e = 0;
+    asset e;
     uint64_t i = 0;
 	
     for (auto& item : sortedContributions) {
-      uint64_t element = item.quantity.amount;
+      auto element = item.quantity;
 		  
       if (element * i + startSum < hardCap) {
         e = element;
   
         uint64_t k = 10000000;
         while (k > 0) {
+          auto ka = asset(k, e.symbol);
           while (e * i + startSum < hardCap) {
-            e += k;
+            e += ka;
           }
-          e -= k;
+          e -= ka;
           k /= 10;
         }
         break;
@@ -98,34 +99,34 @@ bool scrugex::_willRefundExcessiveFunds(uint64_t campaignId) {
       i += 1;
     }
 		
-    uint64_t raised = campaignItem->raised.amount;
-    uint64_t newRaised = campaignItem->raised.amount;
+    auto raised = campaignItem->raised;
+    auto newRaised = campaignItem->raised;
   	
   	// to-do loop sorted contributions again and break after dealing with all
     for (auto& item : contributions) {
-  		if (item.quantity.amount < e) {
+  		if (item.quantity < e) {
         continue;
       }
   		
       excessfunds_i excessfunds(_self, campaignId);
       auto contribution = contributions.find(item.eosAccount.value);
-      uint64_t returnAmount = contribution->quantity.amount - e;
+      auto returnAmount = contribution->quantity - e;
   		
   		excessfunds.emplace(_self, [&](auto& r) {
         r.attemptedPayment = false;
     		r.isPaid = false;
     		r.eosAccount = contribution->eosAccount;
-    		r.quantity = asset(returnAmount, contribution->quantity.symbol);
+    		r.quantity = returnAmount;
   		});
   		contributions.modify(contribution, same_payer, [&](auto& r) {
-  		  r.quantity = asset(e, r.quantity.symbol);
+  		  r.quantity = e;
   		});
-  		newRaised -= returnAmount;
+  		newRaised = newRaised - returnAmount;
     }
 		
     campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-      r.raised = asset(newRaised, r.raised.symbol);
-      r.excessReturned = asset(raised - newRaised, r.raised.symbol);
+      r.raised = newRaised;
+      r.excessReturned = raised - newRaised;
       r.status = Status::excessReturning;
     });
   }
