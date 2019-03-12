@@ -109,16 +109,10 @@ param _extendDeadlineVoting(const voting& votingItem, const campaigns& campaignI
 	// calculate decision
 	if (votingItem.positiveWeight >= get_percent(votingItem.votedWeight, T1)) {
 
-		// to-do test and complete
-
-		// extend all subsequent deadlines
-		for (auto& milestoneItem: milestones) {
-			if (milestoneItem.deadline >= currentMilestoneItem->deadline) {
-				milestones.modify(milestoneItem, same_payer, [&](auto& r) {
-					r.deadline += TIMET;
-				});
-			}
-		}
+		// extend this milestone duration
+		milestones.modify(currentMilestoneItem, same_payer, [&](auto& r) {
+			r.duration *= 1.25;
+		});
 
 		// go back to milestone
 		campaigns.modify(campaignItem, same_payer, [&](auto& r) {
@@ -139,7 +133,7 @@ param _milestoneVoting(const voting& votingItem, const campaigns& campaignItem, 
 	auto currentMilestoneItem = milestones.find(milestoneId);
 	
   // milestone is not over yet
-  if (currentMilestoneItem->deadline > now) {
+  if (currentMilestoneItem->duration + currentMilestoneItem->startTimestamp > now) {
     PASS
   }
 	
@@ -206,6 +200,10 @@ param _milestoneVoting(const voting& votingItem, const campaigns& campaignItem, 
 		campaigns.modify(campaignItem, same_payer, [&](auto& r) {
 			r.currentMilestone = nextMilestoneId;
 			r.status = Status::milestone;
+		});
+		
+		milestones.modify(nextMilestoneItem, same_payer, [&](auto& r) {
+		  r.startTimestamp = now;
 		});
 		
 		// enable exchange 

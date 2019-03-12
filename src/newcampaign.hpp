@@ -68,14 +68,12 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 
 	for (auto milestone: milestones) {
 
-		// to-do validate milestone arguments (make sure it's complete)
-		eosio_assert(lastDeadline < milestone.deadline,
-			"next milestone deadline should always come after previous");
-			
-		eosio_assert(milestone.deadline - lastDeadline > MIN_MILESTONE_DURATION,
-		  "milestone should be longer than 14 days");
+		eosio_assert(milestone.duration >= MIN_MILESTONE_DURATION,
+		  "milestone duration should be longer");
 
-		lastDeadline = milestone.deadline;
+		eosio_assert(milestone.duration <= MAX_MILESTONE_DURATION,
+		  "milestone duration should be shorter");
+
 		totalFundsRelease += milestone.fundsReleasePercent;
 
 		eosio_assert(totalFundsRelease <= 100,
@@ -83,7 +81,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 
 		table.emplace(_self, [&](auto& r) {
 			r.id = table.available_primary_key();
-			r.deadline = milestone.deadline;
+			r.duration = milestone.duration;
 			r.fundsReleasePercent = milestone.fundsReleasePercent;
 		});
 	}

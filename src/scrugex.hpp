@@ -16,7 +16,7 @@ public:
 	scrugex(name receiver, name code, datastream<const char*> ds)
 		: contract(receiver, code, ds) {}
 
-	struct milestoneInfo { uint64_t deadline, fundsReleasePercent; };
+	struct milestoneInfo { uint64_t duration, fundsReleasePercent; };
 
 	void transfer(name from, name to, asset quantity, string memo);
 
@@ -87,8 +87,9 @@ private:
 
 	TABLE milestones {
 		uint8_t id;
-		uint64_t deadline;
+		uint64_t duration;
 		uint64_t fundsReleasePercent;
+		uint64_t startTimestamp;
 
 		uint64_t primary_key() const { return id; }
 	};

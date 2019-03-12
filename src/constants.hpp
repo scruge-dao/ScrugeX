@@ -36,6 +36,9 @@ const uint64_t EXCHANGE_PRICE_PERIOD = 2 * SECOND;
 // minimum milestone duration
 const uint64_t MIN_MILESTONE_DURATION = 1; // 14 * DAY;
 
+// maximum milestone duration
+const uint64_t MAX_MILESTONE_DURATION = 84 * DAY;
+
 // todo this should be an argument in extend action
 // and be saved inside a milestone/vote in question
 const uint64_t TIMET = 14 * DAY; 
