@@ -177,6 +177,7 @@ private:
 		bool isPaid;            // payment was successful
  
     uint64_t primary_key() const { return key; }
+    uint64_t by_userId() const { return userId; }
 		uint64_t by_not_attempted_payment() const { return attemptedPayment ? 1 : 0; }
   };
 
@@ -198,9 +199,8 @@ private:
 		bool attemptedPayment;  // did attemt payment
 		bool isPaid;            // payment was successful
  
-    // descending sort by key 
     uint64_t primary_key() const { return key; }
-    
+    uint64_t by_userId() const { return userId; }
 		uint64_t by_not_attempted_payment() const { return attemptedPayment ? 1 : 0; }
     
     uint64_t special_index() const {
@@ -247,11 +247,13 @@ private:
   typedef multi_index<"exchangeinfo"_n, exchangeinfo> exchangeinfo_i;
   
   typedef multi_index<"sellorders"_n, sellorders,
-		indexed_by<"byap"_n, const_mem_fun<sellorders, uint64_t, &sellorders::by_not_attempted_payment>>
+		indexed_by<"byap"_n, const_mem_fun<sellorders, uint64_t, &sellorders::by_not_attempted_payment>>,
+    indexed_by<"byuserid"_n, const_mem_fun<sellorders, uint64_t, &sellorders::by_userId>>
 		  > sellorders_i;
   
   typedef multi_index<"buyorders"_n, buyorders,
     indexed_by<"specialindex"_n, const_mem_fun<buyorders, uint64_t, &buyorders::special_index>>,
+    indexed_by<"byuserid"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_userId>>,
 		indexed_by<"byap"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_not_attempted_payment>>
       > buyorders_i;
 

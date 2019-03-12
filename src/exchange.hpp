@@ -19,7 +19,6 @@ void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity, asset su
   eosio_assert(sum.symbol.is_valid(), "invalid price");
   eosio_assert(sum.symbol == exchangeItem->investorsFund.symbol, "incorrect price symbol");
 
-  // to-do calculate the price correctly, check it!!!
   double price = (double)quantity.amount / (double)sum.amount;
   
   eosio_assert(price > 0, "token price calculated with arguments passed is too low");
@@ -27,7 +26,18 @@ void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity, asset su
   eosio_assert(price <= exchangeItem->roundPrice,
     "token price calculated with arguments can not be higher than current auction price");
   
+  // delete unpaid orders
   buyorders_i buyorders(_self, campaignId);
+  auto buyordersIndex = buyorders.get_index<"byuserid"_n>();
+  auto item = buyordersIndex.find(userId);
+  while (item != buyordersIndex.end()) {
+    if (!item->paymentReceived) {
+      buyordersIndex.erase(item);
+      break;
+    }
+    item++;
+  }
+  
   buyorders.emplace(eosAccount, [&](auto& r) {
     r.milestoneId = exchangeItem->milestoneId;
     r.key = buyorders.available_primary_key();
@@ -76,16 +86,19 @@ void scrugex::sell(name eosAccount, uint64_t campaignId, asset quantity) {
   // how many tokens will this contribution allows me
   uint64_t paymentAmount = (uint64_t) floor((double)campaignItem->supplyForSale.amount /
           (double)campaignItem->raised.amount * (double)contributionItem->quantity.amount);
-          
+  
   eosio_assert(paymentAmount >= quantity.amount, "can not sell more tokens that you have");
   
   exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
     r.roundSellVolume += quantity;
   });
   
-  // lower contribution amount 
-  
+  // check multiple orders
   sellorders_i sellorders(_self, campaignId);
+  auto sellordersIndex = sellorders.get_index<"byuserid"_n>();
+  auto item = sellordersIndex.find(userId);
+  eosio_assert(item == sellordersIndex.end(), "you can only create one sell order");
+  
   sellorders.emplace(eosAccount, [&](auto& r) {
     r.milestoneId = exchangeItem->milestoneId;
     r.key = sellorders.available_primary_key();
