@@ -250,7 +250,7 @@ private:
 		  > sellorders_i;
   
   typedef multi_index<"buyorders"_n, buyorders,
-    indexed_by<"bypricedesc"_n, const_mem_fun<buyorders, uint64_t, &buyorders::special_index>>,
+    indexed_by<"specialindex"_n, const_mem_fun<buyorders, uint64_t, &buyorders::special_index>>,
 		indexed_by<"byap"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_not_attempted_payment>>
       > buyorders_i;
 
@@ -285,6 +285,7 @@ private:
 	void _updateCampaignsCount(uint64_t scope);
 	uint64_t _getCampaignsCount();
 	asset _getContributionQuantity(uint64_t scope, uint64_t userId);
+	double _updatePrice(uint64_t campaignId);
 
   // refresh cycle methods
   enum RefreshAction: uint8_t { doneT = 0, done = 1, skip = 2, pass = 3 };

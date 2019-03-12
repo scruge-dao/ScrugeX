@@ -288,6 +288,24 @@ uint64_t scrugex::_getCampaignsCount() {
 	return 0;
 } // uint64_t _getCampaignsCount
 
+double scrugex::_updatePrice(uint64_t campaignId) {
+  
+  auto now = time_ms();
+  exchangeinfo_i exchangeinfo(_self, campaignId);
+  auto exchangeItem = exchangeinfo.begin();
+  
+  // to-do calculate time
+  double newPrice = exchangeItem->roundPrice / 5; // to-do formula
+  
+  if (exchangeItem->priceTimestamp + EXCHANGE_PRICE_PERIOD < now) {
+    exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
+      r.priceTimestamp = now;
+      r.roundPrice = newPrice;
+    });
+  }
+  return newPrice;
+}
+
 // to-do optimize
 asset scrugex::_getContributionQuantity(uint64_t scope, uint64_t userId) {
 	contributions_i contributions(_self, scope);

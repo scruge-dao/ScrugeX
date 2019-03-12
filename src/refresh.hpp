@@ -260,29 +260,22 @@ param _closeSell(const campaigns& campaignItem, campaigns_i& campaigns) {
 } // PARAM _sellOver
 
 param _canClose(const campaigns& campaignItem, campaigns_i& campaigns) {
+  _updatePrice(campaignItem.campaignId);
+  
   exchangeinfo_i exchangeinfo(_self, campaignItem.campaignId);
   auto exchangeItem = exchangeinfo.begin();
   
   if (exchangeItem->status == ExchangeStatus::buying) {
     uint64_t now = time_ms();
     
-    // lower auction price when needed
-    if (exchangeItem->priceTimestamp + EXCHANGE_PRICE_PERIOD < now) {
-      exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
-        r.priceTimestamp = now;
-        r.roundPrice /= 5; // to-do formula
-      });
-    }
-
     buyorders_i buyorders(_self, campaignItem.campaignId);
-    auto ordersByPrice = buyorders.get_index<"bypricedesc"_n>(); // to-do smart sort milestone -> price -> time
+    auto ordersByPrice = buyorders.get_index<"specialindex"_n>();
     
     auto sellVolume = exchangeItem->roundSellVolume.amount;
     double roundPrice = (double)exchangeItem->roundPrice;
     double pICO = (double)campaignItem.raised.amount / (double)campaignItem.supplyForSale.amount;
     
     vector<uint64_t> ids;
-    
     for (auto& orderItem : ordersByPrice) {
       
       // process current exchange only
@@ -291,6 +284,7 @@ param _canClose(const campaigns& campaignItem, campaigns_i& campaigns) {
       // skip unpaid orders
       if (!orderItem.paymentReceived) { continue; }
       
+      // elements are sorted, so no point to look further
       if (orderItem.price < exchangeItem->roundPrice) { break; }
       
       uint64_t purchaseAmount = min(orderItem.quantity.amount, sellVolume);
