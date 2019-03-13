@@ -2,7 +2,14 @@
 
 void scrugex::destroy() {
 	require_auth(_self);
-	uint64_t scopes = _getCampaignsCount();
+	
+	// get campaigns count
+	information_i information(_self, _self.value);
+	auto infoItem = information.begin();
+	uint64_t scope = 0;
+	if (information.begin() != information.end()) {
+	  scope = infoItem->campaignsCount;
+	}
 
 	information_i table(_self, _self.value);
 	auto item = table.begin();
@@ -12,7 +19,7 @@ void scrugex::destroy() {
 	auto ca_item = campaigns.begin();
 	while(ca_item != campaigns.end()) { ca_item = campaigns.erase(ca_item); }
 
-	for (int i=0; i < scopes; i++) {
+	for (int i=0; i < scope; i++) {
 		contributions_i contributions(_self, i);
 		auto c_item = contributions.begin();
 		while(c_item != contributions.end()) { c_item = contributions.erase(c_item); }

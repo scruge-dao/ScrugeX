@@ -66,7 +66,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	// update campaigns count
 	information_i information(_self, _self.value);
 	auto infoItem = information.begin();
-	int scope = 0;
+	uint64_t scope = 0;
 	
 	if (information.begin() == information.end()) {
 	  information.emplace(_self, [&](auto& r) {

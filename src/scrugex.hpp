@@ -285,8 +285,6 @@ private:
 	void _startvote(uint64_t campaignId, uint8_t kind);
   void _startExchange(uint64_t campaignId, uint64_t nextMilestoneId);
 	void _refund(uint64_t campaignId);
-	void _updateCampaignsCount(uint64_t scope);
-	uint64_t _getCampaignsCount();
 	asset _getContributionQuantity(uint64_t scope, uint64_t userId);
 	double _updatePrice(uint64_t campaignId);
 
