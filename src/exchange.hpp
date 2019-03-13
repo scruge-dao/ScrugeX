@@ -98,7 +98,14 @@ void scrugex::sell(name eosAccount, uint64_t campaignId, asset quantity) {
   sellorders_i sellorders(_self, campaignId);
   auto sellordersIndex = sellorders.get_index<"byuserid"_n>();
   auto item = sellordersIndex.find(userId);
-  eosio_assert(item == sellordersIndex.end(), "you can only create one sell order");
+  
+  // check all sell orders by this user and decline if one for this milestone exists
+  while (item != sellordersIndex.end() && item->userId == userId) {
+    if (item->milestoneId == exchangeItem->milestoneId) {
+      eosio_assert(item == sellordersIndex.end(), "you can only create one sell order");
+    }
+    item++;
+  }
   
   sellorders.emplace(eosAccount, [&](auto& r) {
     r.milestoneId = exchangeItem->milestoneId;

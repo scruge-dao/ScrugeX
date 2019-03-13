@@ -299,12 +299,9 @@ asset scrugex::_getContributionQuantity(uint64_t scope, uint64_t userId) {
   auto item = index.find(userId);
 
 	asset total = asset(0, EOS_SYMBOL); // replace with investment symbol
-	while (item != index.end()) {
+	while (item != index.end() && item->userId == userId) {
 		if (item->userId == userId) {
 			 total += item->quantity;
-		}
-		else {
-		  break;
 		}
 		item++;
 	}
