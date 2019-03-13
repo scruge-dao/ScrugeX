@@ -139,19 +139,19 @@ bool scrugex::_willRefundExcessiveFunds(uint64_t campaignId) {
 } // void _refundHardCap
 
 uint64_t scrugex::_verify(name eosAccount, bool kycEnabled) {
-	if (kycEnabled) {
-	 // accounts_i accounts("scrugeverify"_n, _self.value);
-	 // auto accountItem = accounts.find(eosAccount);
-	
-	 // eosio_assert(accountItem != accounts.end(), "this scruge account is not verified");
-	 // eosio_assert(accountItem->eosAccount == eosAccount,
-	//     "this eos account is not associated with scruge account");
-	
-	// return accountItem->id;
-}
-
-	return eosAccount.value;
-	
+  if (kycEnabled) {
+    // accounts_i accounts("scrugeverify"_n, _self.value);
+    // auto accountItem = accounts.find(eosAccount);
+    
+    // eosio_assert(accountItem != accounts.end(), "this scruge account is not verified");
+    // eosio_assert(accountItem->eosAccount == eosAccount,
+    //   "this eos account is not associated with scruge account");
+    
+    // return accountItem->id;
+  }
+  
+  return eosAccount.value;
+    
 } // void _verify
 
 void scrugex::_stopvote(uint64_t campaignId) {
