@@ -73,7 +73,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	
 	if (information.begin() == information.end()) {
 	  information.emplace(founderEosAccount, [&](auto& r) {
-	    r.campaignsCount = 0; 
+	    r.campaignsCount = 1;
 	  });
 	}
 	else {

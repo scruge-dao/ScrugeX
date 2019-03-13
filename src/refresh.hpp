@@ -42,7 +42,6 @@ param _initialRelease(const campaigns& campaignItem, campaigns_i& campaigns) {
 		campaigns.modify(campaignItem, same_payer, [&](auto& r) {
 			r.releasedPercent += campaignItem.initialFundsReleasePercent;
 			r.status = Status::milestone;
-			r.startTimestamp = time_ms();
 		});
 	
 		DONE(1)
