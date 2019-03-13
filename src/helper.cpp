@@ -268,7 +268,6 @@ void scrugex::_refund(uint64_t campaignId) {
 } // void _refund
 
 double scrugex::_updatePrice(uint64_t campaignId) {
-  
   auto now = time_ms();
   exchangeinfo_i exchangeinfo(_self, campaignId);
   auto exchangeItem = exchangeinfo.begin();
@@ -283,16 +282,25 @@ double scrugex::_updatePrice(uint64_t campaignId) {
     });
   }
   return newPrice;
-}
+} // double _updatePrice
 
 // to-do optimize
 asset scrugex::_getContributionQuantity(uint64_t scope, uint64_t userId) {
 	contributions_i contributions(_self, scope);
-	asset total = asset(0, EOS_SYMBOL); // use investment symbol
-	for (auto& item : contributions) {
-		if (item.userId == userId) {
-			 total += item.quantity;
+  auto index = contributions.get_index<"byuserid"_n>();
+  auto item = index.find(userId);
+
+	asset total = asset(0, EOS_SYMBOL); // replace with investment symbol
+	while (item != index.end()) {
+		if (item->userId == userId) {
+			 total += item->quantity;
+			 PRINT("userId", item->userId)
 		}
+		else {
+		  PRINT_("break")
+		  break;
+		}
+		item++;
 	}
 	return total;
 } // _getContributionQuantity
