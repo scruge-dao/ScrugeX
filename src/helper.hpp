@@ -293,7 +293,6 @@ double scrugex::_updatePrice(uint64_t campaignId) {
   return newPrice;
 } // double _updatePrice
 
-// to-do optimize
 asset scrugex::_getContributionQuantity(uint64_t scope, uint64_t userId) {
 	contributions_i contributions(_self, scope);
   auto index = contributions.get_index<"byuserid"_n>();
@@ -303,10 +302,8 @@ asset scrugex::_getContributionQuantity(uint64_t scope, uint64_t userId) {
 	while (item != index.end()) {
 		if (item->userId == userId) {
 			 total += item->quantity;
-			 PRINT("userId", item->userId)
 		}
 		else {
-		  PRINT_("break")
 		  break;
 		}
 		item++;
