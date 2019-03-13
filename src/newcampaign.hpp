@@ -29,7 +29,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	campaigns_i campaigns(_self, _self.value);
   auto campaignId = campaigns.available_primary_key();
 
-	campaigns.emplace(_self, [&](auto& r) {
+	campaigns.emplace(founderEosAccount, [&](auto& r) {
 		r.campaignId = campaignId;
 		r.founderEosAccount = founderEosAccount;
 		r.softCap = softCap;
@@ -53,7 +53,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	});
 	
   exchangeinfo_i exchangeinfo(_self, campaignId);
-  exchangeinfo.emplace(_self, [&](auto& r) {
+  exchangeinfo.emplace(founderEosAccount, [&](auto& r) {
     r.status = ExchangeStatus::inactive;
 		r.previousPrice = 0;
 		r.roundPrice = 0;
@@ -69,7 +69,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	uint64_t scope = 0;
 	
 	if (information.begin() == information.end()) {
-	  information.emplace(_self, [&](auto& r) {
+	  information.emplace(founderEosAccount, [&](auto& r) {
 	    r.campaignsCount = 0; 
 	  });
 	}
@@ -100,7 +100,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 		eosio_assert(totalFundsRelease <= 100,
 			"total funds release can not go over 100%");
 
-		table.emplace(_self, [&](auto& r) {
+		table.emplace(founderEosAccount, [&](auto& r) {
 			r.id = table.available_primary_key();
 			r.duration = milestone.duration;
 			r.fundsReleasePercent = milestone.fundsReleasePercent;
