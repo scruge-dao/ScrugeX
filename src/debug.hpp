@@ -6,7 +6,7 @@ void scrugex::destroy() {
 	// get campaigns count
 	information_i information(_self, _self.value);
 	auto infoItem = information.begin();
-	uint64_t scope = 0;
+	uint64_t scope = 1;
 	if (information.begin() != information.end()) {
 	  scope = infoItem->campaignsCount;
 	}

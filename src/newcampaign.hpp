@@ -9,6 +9,9 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	
 	eosio_assert(!kycEnabled, "kyc is not implemented yet");
 	
+  eosio_assert(tokenContract != "eosio.token"_n && supplyForSale.symbol != EOS_SYMBOL, 
+    "you can not raise money for EOS");
+	
 	// to-do validate arguments (make sure it's complete)
 	eosio_assert(softCap < hardCap, "hard cap should be higher than soft cap");
 	eosio_assert(milestones.size() > 0, "no milestones passed");
