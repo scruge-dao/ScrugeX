@@ -7,7 +7,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	
 	auto investmentSymbol = hardCap.symbol;
 	
-	eosio_assert(kycEnabled, "kyc is not implemented yet");
+	eosio_assert(!kycEnabled, "kyc is not implemented yet");
 	
 	// to-do validate arguments (make sure it's complete)
 	eosio_assert(softCap < hardCap, "hard cap should be higher than soft cap");
