@@ -200,7 +200,7 @@ void scrugex::_startvote(uint64_t campaignId, uint8_t kind) {
 
 	eosio_assert(thisVote == voting.end(), "this voting already exists");
 	
-	auto duration = (milestoneItem->endTimestamp - milestoneItem->startTimestamp) / 10;
+	auto duration = milestoneItem->duration / 10;
 	duration = max(MIN_VOTING_DURATION, duration);
 	duration = min(MAX_VOTING_DURATION, duration);
 	
