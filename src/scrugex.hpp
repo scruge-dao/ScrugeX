@@ -3,7 +3,7 @@
 #include <eosiolib/asset.hpp>
 
 #include "constants.hpp"
-#include "methods.cpp"
+#include "methods.hpp"
 
 using namespace eosio;
 using namespace std;

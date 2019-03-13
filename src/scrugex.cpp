@@ -1,13 +1,13 @@
 #include "scrugex.hpp"
-#include "debug.cpp"
-#include "helper.cpp"
-#include "refresh.cpp"
-#include "transfer.cpp"
-#include "newcampaign.cpp"
-#include "exchange.cpp"
-#include "manage.cpp"
-#include "payment.cpp"
-#include "vote.cpp"
+#include "debug.hpp"
+#include "helper.hpp"
+#include "refresh.hpp"
+#include "transfer.hpp"
+#include "newcampaign.hpp"
+#include "exchange.hpp"
+#include "manage.hpp"
+#include "payment.hpp"
+#include "vote.hpp"
 
 // dispatch
 

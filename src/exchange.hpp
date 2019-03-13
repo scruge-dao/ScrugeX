@@ -15,12 +15,10 @@ void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity, asset su
   
   eosio_assert(quantity.symbol.is_valid(), "invalid quantity");
   eosio_assert(quantity.symbol == exchangeItem->roundSellVolume.symbol, "incorrect quantity symbol");
-  eosio_assert(quantity.amount > 0, "only positive quantity allowed");
   
   eosio_assert(sum.symbol.is_valid(), "invalid price");
   eosio_assert(sum.symbol == exchangeItem->investorsFund.symbol, "incorrect price symbol");
-  eosio_assert(sum.amount > 0, "only positive sum allowed");
-  
+
   double price = (double)quantity.amount / (double)sum.amount;
   
   eosio_assert(price > 0, "token price calculated with arguments passed is too low");
@@ -35,6 +33,7 @@ void scrugex::buy(name eosAccount, uint64_t campaignId, asset quantity, asset su
   while (item != buyordersIndex.end()) {
     if (!item->paymentReceived) {
       buyordersIndex.erase(item);
+      break;
     }
     item++;
   }
