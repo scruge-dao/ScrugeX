@@ -9,7 +9,6 @@
 *.o
 *.obj
 *.wasm
-*.abi
 
 # Precompiled Headers
 *.gch
