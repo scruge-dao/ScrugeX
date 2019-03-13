@@ -342,7 +342,7 @@ param _canClose(const campaigns& campaignItem, campaigns_i& campaigns) {
         }
         else {
           contributions.modify(contributionItem, same_payer, [&](auto& r) {
-            r.quantity -= asset(spent, r.quantity.symbol);
+            r.quantity += asset(spent, r.quantity.symbol);
           });
         }
       }
