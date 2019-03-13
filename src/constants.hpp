@@ -21,7 +21,7 @@ const uint64_t EXTEND_VOTING_THRESHOLD = 50;
 const uint64_t WAITING_TIME = 3 * DAY;
 
 // max duration of voting
-const uint64_t MIN_VOTING_DURATION = 1; // 3 * DAY;
+const uint64_t MIN_VOTING_DURATION = 3 * DAY;
 
 // duration of voting
 const uint64_t MAX_VOTING_DURATION = 7 * DAY;
