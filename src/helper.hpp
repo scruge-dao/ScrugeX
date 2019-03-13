@@ -184,10 +184,12 @@ void scrugex::_startvote(uint64_t campaignId, uint8_t kind) {
 	auto campaignItem = campaigns.find(campaignId);
 	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 	eosio_assert(campaignItem->active, "campaign is no longer active");
+	eosio_assert(campaignItem->status == Status::milestone, "milestone is not running");
 
 	// get current milestone
 	milestones_i milestones(_self, campaignItem->campaignId);
 	auto milestoneId = campaignItem->currentMilestone;
+	auto milestoneItem = milestones.find(milestoneId);
 
 	// create a voting record
 	voting_i voting(_self, campaignItem->campaignId);
@@ -198,9 +200,12 @@ void scrugex::_startvote(uint64_t campaignId, uint8_t kind) {
 
 	eosio_assert(thisVote == voting.end(), "this voting already exists");
 	
-	// check other votes
+	auto duration = (milestoneItem->endTimestamp - milestoneItem->startTimestamp) / 10;
+	duration = max(MIN_VOTING_DURATION, duration);
+	duration = min(MAX_VOTING_DURATION, duration);
+	
 	auto now = time_ms();
-	auto end = now + VOTING_DURATION;
+	auto end = now + duration;
 
 	// delete voters from previous voting
 	voters_i voters(_self, campaignItem->campaignId);
