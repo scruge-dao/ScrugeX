@@ -107,7 +107,7 @@ param _extendDeadlineVoting(const voting& votingItem, const campaigns& campaignI
 	_stopvote(campaignItem.campaignId);
 
 	// calculate decision
-	if (votingItem.positiveWeight >= get_percent(votingItem.votedWeight, T1)) {
+	if (votingItem.positiveWeight >= get_percent(votingItem.votedWeight, EXTEND_VOTING_THRESHOLD)) {
 
 		// extend this milestone duration
 		milestones.modify(currentMilestoneItem, same_payer, [&](auto& r) {
@@ -155,7 +155,7 @@ param _milestoneVoting(const voting& votingItem, const campaigns& campaignItem, 
 	_stopvote(campaignItem.campaignId);
 	
 	// if failed, change state and return 
-	if (votingItem.positiveWeight < get_percent(votingItem.votedWeight, T1)) {
+	if (votingItem.positiveWeight < get_percent(votingItem.votedWeight, MILESTONE_VOTING_THRESHOLD)) {
 	  
 		// milestone vote failed
 		// wait for some time for founder to return funds or start extend voting

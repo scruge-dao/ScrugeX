@@ -12,10 +12,10 @@ const uint64_t HOUR = 60 * MINUTE;
 const uint64_t DAY = 24 * HOUR;
 
 // threshold of votes for releasing funds
-const uint64_t T1 = 66; 
+const uint64_t MILESTONE_VOTING_THRESHOLD = 50; 
 
 // threshold of votes for extending deadline
-const uint64_t T2 = 66; 
+const uint64_t EXTEND_VOTING_THRESHOLD = 50; 
 
 // duration to wait for founder input after failed milestone voting
 const uint64_t WAITING_TIME = 3 * DAY;
