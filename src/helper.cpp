@@ -267,28 +267,6 @@ void scrugex::_refund(uint64_t campaignId) {
 	
 } // void _refund
 
-void scrugex::_updateCampaignsCount(uint64_t scope) {
-	information_i information(_self, _self.value);
-	
-	auto lambda = [&](auto& row) {
-		row.campaignsCount = scope + 1;
-	};
-
-	if (information.begin() == information.end()) {
-		information.emplace(_self, lambda);
-	}
-	else { information.modify(information.begin(), same_payer, lambda); }
-	
-} // void _updateCampaignsCount
-
-uint64_t scrugex::_getCampaignsCount() {
-	information_i information(_self, _self.value);
-	for (auto& item : information) {
-		return item.campaignsCount;
-	}
-	return 0;
-} // uint64_t _getCampaignsCount
-
 double scrugex::_updatePrice(uint64_t campaignId) {
   
   auto now = time_ms();

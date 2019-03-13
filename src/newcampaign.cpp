@@ -9,8 +9,10 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	
 	// to-do validate arguments (make sure it's complete)
 	eosio_assert(softCap < hardCap, "hard cap should be higher than soft cap");
-	eosio_assert(startTimestamp < endTimestamp, "campaign end can not be earlier than campaign start");
 	eosio_assert(milestones.size() > 0, "no milestones passed");
+	
+	eosio_assert(campaignDuration > MIN_CAMPAIGN_DURATION, "campaign should be longer than 2 weeks");
+	eosio_assert(campaignDuration < MAX_CAMPAIGN_DURATION, "campaign should be shorter than 8 weeks");
 	
 	eosio_assert(supplyForSale.symbol.is_valid(), "invalid supply for sale");
 	eosio_assert(hardCap.symbol.is_valid(), "invalid hard cap");
@@ -19,8 +21,8 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	eosio_assert(hardCap.symbol == softCap.symbol, "cap symbols mismatch");
 	eosio_assert(hardCap.symbol == EOS_SYMBOL, "only EOS can be used to receive investments");
 	
-	eosio_assert(initialFundsReleasePercent < 50,
-		"initial funds release can not be higher than 50%");
+	eosio_assert(initialFundsReleasePercent < 25,
+		"initial funds release can not be higher than 25%");
 
 	campaigns_i campaigns(_self, _self.value);
   auto campaignId = campaigns.available_primary_key();
@@ -59,11 +61,25 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 		r.priceTimestamp = 0;
 	});
 
-	int scope = _getCampaignsCount();
-	_updateCampaignsCount(scope);
+	// update campaigns count
+	information_i information(_self, _self.value);
+	auto infoItem = information.begin();
+	int scope = 0;
+	
+	if (information.begin() == information.end()) {
+	  information.emplace(_self, [&](auto& r) {
+	    r.campaignsCount = 0; 
+	  });
+	}
+	else {
+	  scope = infoItem->campaignsCount;
+	  information.modify(information.begin(), same_payer, [&](auto& r) { 
+	    r.campaignsCount = scope + 1; 
+	  });
+	}
 
+  // save milestones
 	milestones_i table(_self, scope);
-	auto lastDeadline = endTimestamp;
 	auto totalFundsRelease = initialFundsReleasePercent;
 
 	for (auto milestone: milestones) {
@@ -73,6 +89,9 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 
 		eosio_assert(milestone.duration <= MAX_MILESTONE_DURATION,
 		  "milestone duration should be shorter");
+
+		eosio_assert(milestone.fundsReleasePercent <= 25,
+		  "milestone funds release can not be higher than 25%");
 
 		totalFundsRelease += milestone.fundsReleasePercent;
 
