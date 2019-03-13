@@ -38,6 +38,12 @@ param _initialRelease(const campaigns& campaignItem, campaigns_i& campaigns) {
 		auto quantity = get_percent(campaignItem.raised, campaignItem.initialFundsReleasePercent);
 		_transfer(campaignItem.founderEosAccount, quantity, "ScrugeX: Initial Funds");
 
+    milestones_i milestones(_self, campaignItem.campaignId);
+    auto firstMilestone = milestones.find(0);
+    milestones.modify(firstMilestone, same_payer, [&](auto& r) {
+			r.startTimestamp = time_ms();
+    });
+
 		// start milestones
 		campaigns.modify(campaignItem, same_payer, [&](auto& r) {
 			r.releasedPercent += campaignItem.initialFundsReleasePercent;
