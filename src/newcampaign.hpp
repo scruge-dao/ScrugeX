@@ -13,8 +13,8 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	eosio_assert(softCap < hardCap, "hard cap should be higher than soft cap");
 	eosio_assert(milestones.size() > 0, "no milestones passed");
 	
-	eosio_assert(campaignDuration > MIN_CAMPAIGN_DURATION, "campaign should be longer than 2 weeks");
-	eosio_assert(campaignDuration < MAX_CAMPAIGN_DURATION, "campaign should be shorter than 8 weeks");
+	eosio_assert(campaignDuration >= MIN_CAMPAIGN_DURATION, "campaign should be longer than 2 weeks");
+	eosio_assert(campaignDuration <= MAX_CAMPAIGN_DURATION, "campaign should be shorter than 8 weeks");
 	
 	eosio_assert(supplyForSale.symbol.is_valid(), "invalid supply for sale");
 	eosio_assert(hardCap.symbol.is_valid(), "invalid hard cap");
@@ -23,7 +23,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	eosio_assert(hardCap.symbol == softCap.symbol, "cap symbols mismatch");
 	eosio_assert(hardCap.symbol == EOS_SYMBOL, "only EOS can be used to receive investments");
 	
-	eosio_assert(initialFundsReleasePercent < 25,
+	eosio_assert(initialFundsReleasePercent <= 25,
 		"initial funds release can not be higher than 25%");
 
 	campaigns_i campaigns(_self, _self.value);
