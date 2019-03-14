@@ -1,7 +1,7 @@
 #define PASS return make_tuple(0, RefreshAction::pass);
-#define SKIP PRINT_("SKIP") return make_tuple(0, RefreshAction::skip);
-#define DONE_ PRINT_("DONE_") return make_tuple(0, RefreshAction::done);
-#define DONE(x) PRINT("DONE", x) return make_tuple((x), RefreshAction::doneT);
+#define SKIP return make_tuple(0, RefreshAction::skip);
+#define DONE_ return make_tuple(0, RefreshAction::done);
+#define DONE(x) return make_tuple((x), RefreshAction::doneT);
 
 #define INIT uint64_t t = 0, nextRefreshTime = REFRESH_PERIOD; RefreshAction action;
 #define R_CHECK(x) tie(t, action) = (x)(campaignItem, campaigns); if (action == RefreshAction::pass) {} else if (action == RefreshAction::doneT) { nextRefreshTime = t; break; } else if (action == RefreshAction::done) { break; } else if (action == RefreshAction::skip) { continue; }
@@ -10,8 +10,11 @@
 #define param scrugex::param scrugex::
 
 param _campaignFunding(const campaigns& campaignItem, campaigns_i& campaigns) {
-  if (time_ms() < campaignItem.endTimestamp || campaignItem.active == false) {
+  if (time_ms() < campaignItem.endTimestamp) {
 		SKIP
+	}
+	if (campaignItem.status == Status::refunding || campaignItem.status == Status::distributing) {
+	  SKIP
 	}
 	PASS 
 } // PARAM _campaignOver
@@ -65,8 +68,7 @@ param _waiting(const campaigns& campaignItem, campaigns_i& campaigns) {
 
 param _refunding(const campaigns& campaignItem, campaigns_i& campaigns) {
 	if (campaignItem.status == Status::refunding || 
-			campaignItem.status == Status::distributing ||
-			campaignItem.status == Status::excessReturning) {
+			campaignItem.status == Status::distributing) {
 		_schedulePay(campaignItem.campaignId);
 		SKIP
 	}
@@ -82,10 +84,8 @@ param _voting(const campaigns& campaignItem, campaigns_i& campaigns) {
   auto activeVoting = voting.get_index<"byactive"_n>();
   auto votingItem = activeVoting.begin();
   
-  PRINT_("_extendDeadlineVoting")
   V_CHECK(_extendDeadlineVoting)
   
-  PRINT_("_milestoneVoting")
 	V_CHECK(_milestoneVoting)
 	
 	PASS
@@ -230,10 +230,8 @@ param _runExchange(const campaigns& campaignItem, campaigns_i& campaigns) {
   
   if (exchangeItem->status != ExchangeStatus::inactive) {
     
-    PRINT_("_closeSell")
     X_CHECK(_closeSell)
     
-    PRINT_("_canClose")
     X_CHECK(_canClose)
   }
   
@@ -246,8 +244,6 @@ param _closeSell(const campaigns& campaignItem, campaigns_i& campaigns) {
   auto exchangeItem = exchangeinfo.begin();
   
   if (exchangeItem->status == ExchangeStatus::selling && exchangeItem->sellEndTimestamp < time_ms()) {
-    
-    PRINT_("exchange: sell phase ended")
     
     sellorders_i sellorders(_self, campaignItem.campaignId);
     
@@ -407,16 +403,12 @@ void scrugex::refresh() {
 	campaigns_i campaigns(_self, _self.value);
 	for (auto& campaignItem: campaigns) {
 
-    PRINT_("_campaignFunding")
 		R_CHECK(_campaignFunding)
 		
-		PRINT_("_initialRelease")
 		R_CHECK(_initialRelease)
 		
-		PRINT_("_waiting")
 		R_CHECK(_waiting)
 
-    PRINT_("_refunding")
     R_CHECK(_refunding)
     
     R_CHECK(_runExchange)

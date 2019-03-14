@@ -127,7 +127,6 @@ bool scrugex::_willRefundExcessiveFunds(uint64_t campaignId) {
     campaigns.modify(campaignItem, same_payer, [&](auto& r) {
       r.raised = newRaised;
       r.excessReturned = raised - newRaised;
-      r.status = Status::excessReturning;
     });
   }
 	
@@ -158,7 +157,6 @@ void scrugex::_stopvote(uint64_t campaignId) {
 	campaigns_i campaigns(_self, _self.value);
 	auto campaignItem = campaigns.find(campaignId);
 	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
-	eosio_assert(campaignItem->active, "campaign is no longer active");
 
 	milestones_i milestones(_self, campaignItem->campaignId);
 	auto milestoneId = campaignItem->currentMilestone;
@@ -183,7 +181,6 @@ void scrugex::_startvote(uint64_t campaignId, uint8_t kind) {
 	campaigns_i campaigns(_self, _self.value);
 	auto campaignItem = campaigns.find(campaignId);
 	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
-	eosio_assert(campaignItem->active, "campaign is no longer active");
 	eosio_assert(campaignItem->status == Status::milestone, "milestone is not running");
 
 	// get current milestone
@@ -298,7 +295,7 @@ asset scrugex::_getContributionQuantity(uint64_t scope, uint64_t userId) {
   auto index = contributions.get_index<"byuserid"_n>();
   auto item = index.find(userId);
 
-	asset total = asset(0, EOS_SYMBOL); // replace with investment symbol
+	asset total = asset(0, EOS_SYMBOL); // to-do replace with investment symbol
 	while (item != index.end() && item->userId == userId) {
 		if (item->userId == userId) {
 			 total += item->quantity;
@@ -306,4 +303,20 @@ asset scrugex::_getContributionQuantity(uint64_t scope, uint64_t userId) {
 		item++;
 	}
 	return total;
-} // _getContributionQuantity
+} // asset _getContributionQuantity
+
+// no exchanges with id 0 should exist, so 0 means none
+int8_t scrugex::_getLastCompleteExchangeId(uint64_t campaignId) {
+  exchangeinfo_i exchange(_self, campaignId);
+  auto exchangeItem = exchange.begin();
+	
+  if (exchangeItem == exchange.end() || exchangeItem->milestoneId == 0) {
+    return 0;
+  }
+  
+  if (exchangeItem->status == ExchangeStatus::inactive) {
+    return exchangeItem->milestoneId;
+  }
+  return exchangeItem->milestoneId - 1;
+  
+} // int8_t _getLastCompleteExchangeId

@@ -39,7 +39,7 @@ public:
 private:
 
 	enum Status: uint8_t { funding = 0, milestone = 1, activeVote = 2, waiting = 3,
-							 refunding = 4, distributing = 5, excessReturning = 6 };
+							 refunding = 4, distributing = 5 };
 	
 	enum ExchangeStatus: uint8_t { inactive = 0, selling = 1, buying = 2 };
 	
@@ -80,7 +80,7 @@ private:
 		uint64_t backersCount;
 		uint8_t currentMilestone;
 		bool kycEnabled;
-		bool active;
+		// bool active;
 		
 		uint64_t primary_key() const { return campaignId; }
 	};
@@ -104,21 +104,25 @@ private:
 		bool isPaid;            // payment was successful
  
 		uint64_t primary_key() const { return eosAccount.value; }
+	
+		uint64_t by_amount_desc() const {
+		  return UINT64_MAX - quantity.amount; 
+		}
+		
 		uint64_t by_userId() const { return userId; }
-		uint64_t by_not_attempted_payment() const { return attemptedPayment ? 1 : 0; }
-		uint64_t by_amount_desc() const { return numeric_limits<uint64_t>::max() - quantity.amount; }
 	};
 	
 	TABLE excessfunds {
-	asset quantity;
-	name eosAccount;
+  	asset quantity;
+  	name eosAccount;
 	
 		// distribution flags
 		bool attemptedPayment;  // did attemt payment
 		bool isPaid;            // payment was successful
  
 	  uint64_t primary_key() const { return eosAccount.value; }
-		uint64_t by_not_attempted_payment() const { return attemptedPayment ? 1 : 0; }
+		
+		uint64_t by_eos_account() const { return eosAccount.value; }
 	};
 
 	TABLE voting {
@@ -135,9 +139,8 @@ private:
 		uint64_t startTimestamp;
 		bool active;
 
-    uint64_t by_active() const { return active ? 0 : 1; }
-    
 		uint64_t primary_key() const { return voteId; }
+    uint64_t by_active() const { return active ? 0 : 1; }
 	};
 
 	TABLE voters {
@@ -165,8 +168,6 @@ private:
     uint64_t milestoneId;
     uint64_t key;
     name eosAccount;
-    
-    // to-do link with milestones to claim remaining eos from multiple exchange runs
     uint64_t userId;
     asset quantity;
     uint64_t timestamp;
@@ -177,15 +178,14 @@ private:
 		bool isPaid;            // payment was successful
  
     uint64_t primary_key() const { return key; }
+    
     uint64_t by_userId() const { return userId; }
-		uint64_t by_not_attempted_payment() const { return attemptedPayment ? 1 : 0; }
   };
 
   TABLE buyorders {
     uint64_t milestoneId;
     uint64_t key;
     name eosAccount;
-    // to-do link with milestones to claim remaining eos from multiple exchange runs 
     bool paymentReceived;
     uint64_t userId;
     asset quantity;
@@ -200,8 +200,8 @@ private:
 		bool isPaid;            // payment was successful
  
     uint64_t primary_key() const { return key; }
+    
     uint64_t by_userId() const { return userId; }
-		uint64_t by_not_attempted_payment() const { return attemptedPayment ? 1 : 0; }
     
     uint64_t special_index() const {
       
@@ -233,12 +233,11 @@ private:
 	    > voting_i;
 	
 	typedef multi_index<"excessfunds"_n, excessfunds,
-		indexed_by<"byap"_n, const_mem_fun<excessfunds, uint64_t, &excessfunds::by_not_attempted_payment>>
+		indexed_by<"byeosaccount"_n, const_mem_fun<excessfunds, uint64_t, &excessfunds::by_eos_account>>
 			> excessfunds_i;
 
 	typedef multi_index<"contribution"_n, contribution,
 		indexed_by<"byuserid"_n, const_mem_fun<contribution, uint64_t, &contribution::by_userId>>,
-		indexed_by<"byap"_n, const_mem_fun<contribution, uint64_t, &contribution::by_not_attempted_payment>>,
 		indexed_by<"byamountdesc"_n, const_mem_fun<contribution, uint64_t, &contribution::by_amount_desc>>
 			> contributions_i;
 	
@@ -247,14 +246,12 @@ private:
   typedef multi_index<"exchangeinfo"_n, exchangeinfo> exchangeinfo_i;
   
   typedef multi_index<"sellorders"_n, sellorders,
-		indexed_by<"byap"_n, const_mem_fun<sellorders, uint64_t, &sellorders::by_not_attempted_payment>>,
     indexed_by<"byuserid"_n, const_mem_fun<sellorders, uint64_t, &sellorders::by_userId>>
 		  > sellorders_i;
   
   typedef multi_index<"buyorders"_n, buyorders,
     indexed_by<"specialindex"_n, const_mem_fun<buyorders, uint64_t, &buyorders::special_index>>,
-    indexed_by<"byuserid"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_userId>>,
-		indexed_by<"byap"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_not_attempted_payment>>
+    indexed_by<"byuserid"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_userId>>
       > buyorders_i;
 
 	// to access kyc/aml table
@@ -287,6 +284,7 @@ private:
 	void _refund(uint64_t campaignId);
 	asset _getContributionQuantity(uint64_t scope, uint64_t userId);
 	double _updatePrice(uint64_t campaignId);
+	int8_t _getLastCompleteExchangeId(uint64_t campaignId);
 
   // refresh cycle methods
   enum RefreshAction: uint8_t { doneT = 0, done = 1, skip = 2, pass = 3 };
