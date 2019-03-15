@@ -24,14 +24,21 @@ class Test(unittest.TestCase):
 		reset()
 
 		create_master_account("master")
+		create_account("founder", master, "founder")
 
 		key = CreateKey(is_verbose=False)
 
 		# Token
 
 		create_account("eosio_token", master, "eosio.token")
+		create_account("token", master, "token")
 
 		token_contract = Contract(eosio_token, "02_eosio_token")
+		if not token_contract.is_built():
+			token_contract.build()
+		token_contract.deploy()
+
+		token_contract = Contract(token, "02_eosio_token")
 		if not token_contract.is_built():
 			token_contract.build()
 		token_contract.deploy()
@@ -54,45 +61,42 @@ class Test(unittest.TestCase):
 				},
 			Permission.OWNER, (eosioscrugex, Permission.OWNER))
 
-		bounty_contract = Contract(eosioscrugex, "ScrugeX/src")
-		if not bounty_contract.is_built():
-			bounty_contract.build()
-		bounty_contract.deploy()
+		contract = Contract(eosioscrugex, "ScrugeX/src/")
+		if not contract.is_built():
+			contract.build()
+		contract.deploy()
 
 		# Distribute tokens
 
 		create_issue(eosio_token, master, "EOS")
-
-		# Users
-
-		create_account("founder", master, "founder")
-
-		for s in investors:
-			create_account(s, master, s)
-			transfer(eosio_token, master, s, "1000000.0000 EOS", "")
+		create_issue(token, founder, "TEST")
 
 	def run(self, result=None):
 		super().run(result)
 
 	# tests
 
-	def test_create_project(self):
-		newcampaign(eosioscrugex)
+	def test_newcampaign(self):
+		
+		assertErrors(self, [
 
-		i = 1
-		for s in investors:
-			transfer(eosio_token, s, eosioscrugex, "1000.0000 EOS", "%d-0"%i)
-			i += 1
+			["hard cap should be higher than soft cap", 
+			lambda: newcampaign(eosioscrugex, founder, softCap="20.0000 EOS")],
+		
+			["you can not raise money for EOS",
+			lambda: newcampaign(eosioscrugex, founder, token="eosio.token")],
+		
+			["you can not raise money for EOS",
+			lambda: newcampaign(eosioscrugex, founder, supply="10.0000 EOS")],
 
-		refresh(eosioscrugex)
+			["min contribution should not be lower than max",
+			lambda: newcampaign(eosioscrugex, founder, minContrib="7.0000 EOS")],
 
-		sleep(10)
+			["cap symbols mismatch", 
+			lambda: newcampaign(eosioscrugex, founder, softCap="20.0000 EOS", hardCap="10.000 EOS")]
+		])
 
-		refresh(eosioscrugex)
 
-		sleep(1)
-
-		# check table
 
 
 # main

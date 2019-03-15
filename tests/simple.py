@@ -61,10 +61,10 @@ class Test(unittest.TestCase):
 				},
 			Permission.OWNER, (eosioscrugex, Permission.OWNER))
 
-		bounty_contract = Contract(eosioscrugex, "ScrugeX/src")
-		if not bounty_contract.is_built():
-			bounty_contract.build()
-		bounty_contract.deploy()
+		contract = Contract(eosioscrugex, "ScrugeX/src")
+		if not contract.is_built():
+			contract.build()
+		contract.deploy()
 
 		# Distribute tokens
 
@@ -82,8 +82,12 @@ class Test(unittest.TestCase):
 
 	# tests
 
-	def test_create_project(self):
-		newcampaign(eosioscrugex, founder)
+	def test(self):
+		newcampaign(eosioscrugex, founder,
+			supply="100.0000 TEST", token="token",
+			softCap="10.0000 EOS", hardCap="20.0000 EOS", initial=25,
+			minContrib="0.0010 EOS", maxContrib=35, duration=8000)
+		
 		transfer(token, founder, eosioscrugex, "100.0000 TEST", "0")
 
 		sleep(2)
