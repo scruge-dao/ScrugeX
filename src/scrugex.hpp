@@ -22,7 +22,7 @@ public:
 
 	ACTION newcampaign(name founderEosAccount, asset softCap, asset hardCap, 
 	  asset supplyForSale, name tokenContract, uint64_t initialFundsReleasePercent, bool kycEnabled,
-		uint64_t maxUserContributionPercent, uint64_t minUserContributionPercent,
+		uint64_t maxUserContributionPercent, asset minUserContribution,
 		uint64_t startTimestamp, uint64_t campaignDuration, vector<milestoneInfo> milestones);
 
 	ACTION vote(name eosAccount, uint64_t campaignId, bool vote);
@@ -75,7 +75,7 @@ private:
 		
 		uint64_t initialFundsReleasePercent;
 		uint64_t maxUserContributionPercent;
-		uint64_t minUserContributionPercent;
+		asset minUserContribution;
 		uint64_t releasedPercent;
 		
 		uint64_t backersCount;

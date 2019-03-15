@@ -1,6 +1,6 @@
 void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap, 
 		asset supplyForSale, name tokenContract, uint64_t initialFundsReleasePercent, bool kycEnabled,
-		uint64_t maxUserContributionPercent, uint64_t minUserContributionPercent,
+		uint64_t maxUserContributionPercent, asset minUserContribution,
 		uint64_t startTimestamp, uint64_t campaignDuration, vector<milestoneInfo> milestones) {
 
   _assertPaused();
@@ -45,7 +45,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 		r.hardCap = hardCap;
 		r.initialFundsReleasePercent = initialFundsReleasePercent;
 		r.maxUserContributionPercent = maxUserContributionPercent;
-		r.minUserContributionPercent = minUserContributionPercent;
+		r.minUserContribution = minUserContribution;
 		r.startTimestamp = startTimestamp;
 		r.endTimestamp = startTimestamp + campaignDuration;
 		r.raised = asset(0, investmentSymbol);

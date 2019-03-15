@@ -22,6 +22,7 @@ uint64_t get_percent(uint64_t value, uint64_t percent) {
 	return value * percent / 100;
 }
 
+// to-do think about overflow behaviour
 asset get_percent(asset quantity, uint64_t percent) {
 	auto amount = get_percent(quantity.amount, percent);
 	return asset(amount, quantity.symbol);
