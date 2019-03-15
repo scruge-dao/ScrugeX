@@ -104,12 +104,9 @@ private:
 		bool isPaid;            // payment was successful
  
 		uint64_t primary_key() const { return eosAccount.value; }
-	
-		uint64_t by_amount_desc() const {
-		  return UINT64_MAX - quantity.amount; 
-		}
-		
+		uint64_t by_amount_desc() const { return UINT64_MAX - quantity.amount; }
 		uint64_t by_userId() const { return userId; }
+		uint64_t by_ap() const { return attemptedPayment ? 1 : 0; }
 	};
 	
 	TABLE excessfunds {
@@ -121,8 +118,8 @@ private:
 		bool isPaid;            // payment was successful
  
 	  uint64_t primary_key() const { return eosAccount.value; }
-		
 		uint64_t by_eos_account() const { return eosAccount.value; }
+		uint64_t by_ap() const { return attemptedPayment ? 1 : 0; }
 	};
 
 	TABLE voting {
@@ -178,8 +175,8 @@ private:
 		bool isPaid;            // payment was successful
  
     uint64_t primary_key() const { return key; }
-    
     uint64_t by_userId() const { return userId; }
+		uint64_t by_ap() const { return attemptedPayment ? 1 : 0; }
   };
 
   TABLE buyorders {
@@ -200,8 +197,8 @@ private:
 		bool isPaid;            // payment was successful
  
     uint64_t primary_key() const { return key; }
-    
     uint64_t by_userId() const { return userId; }
+		uint64_t by_ap() const { return attemptedPayment ? 1 : 0; }
     
     uint64_t special_index() const {
       
@@ -233,11 +230,13 @@ private:
 	    > voting_i;
 	
 	typedef multi_index<"excessfunds"_n, excessfunds,
-		indexed_by<"byeosaccount"_n, const_mem_fun<excessfunds, uint64_t, &excessfunds::by_eos_account>>
+		indexed_by<"byeosaccount"_n, const_mem_fun<excessfunds, uint64_t, &excessfunds::by_eos_account>>,
+		indexed_by<"byap"_n, const_mem_fun<excessfunds, uint64_t, &excessfunds::by_ap>>
 			> excessfunds_i;
 
 	typedef multi_index<"contribution"_n, contribution,
 		indexed_by<"byuserid"_n, const_mem_fun<contribution, uint64_t, &contribution::by_userId>>,
+		indexed_by<"byap"_n, const_mem_fun<contribution, uint64_t, &contribution::by_ap>>,
 		indexed_by<"byamountdesc"_n, const_mem_fun<contribution, uint64_t, &contribution::by_amount_desc>>
 			> contributions_i;
 	
@@ -246,12 +245,14 @@ private:
   typedef multi_index<"exchangeinfo"_n, exchangeinfo> exchangeinfo_i;
   
   typedef multi_index<"sellorders"_n, sellorders,
-    indexed_by<"byuserid"_n, const_mem_fun<sellorders, uint64_t, &sellorders::by_userId>>
+    indexed_by<"byuserid"_n, const_mem_fun<sellorders, uint64_t, &sellorders::by_userId>>,
+    indexed_by<"byap"_n, const_mem_fun<sellorders, uint64_t, &sellorders::by_ap>>
 		  > sellorders_i;
   
   typedef multi_index<"buyorders"_n, buyorders,
     indexed_by<"specialindex"_n, const_mem_fun<buyorders, uint64_t, &buyorders::special_index>>,
-    indexed_by<"byuserid"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_userId>>
+    indexed_by<"byuserid"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_userId>>,
+    indexed_by<"byap"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_ap>>
       > buyorders_i;
 
 	// to access kyc/aml table
