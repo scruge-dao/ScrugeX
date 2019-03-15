@@ -29,7 +29,7 @@ public:
 	ACTION extend(uint64_t campaignId);
 	ACTION refund(uint64_t campaignId);
 	ACTION refresh();
-	ACTION destroy();
+	ACTION zdestroy();
 	ACTION send(name eosAccount, uint64_t campaignId);
 	ACTION take(name eosAccount, uint64_t campaignId);
 	ACTION pay(uint64_t campaignId);

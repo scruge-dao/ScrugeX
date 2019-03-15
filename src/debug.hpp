@@ -1,6 +1,6 @@
 // methods for debug purposes
 
-void scrugex::destroy() {
+void scrugex::zdestroy() {
 	require_auth(_self);
 	
 	// get campaigns count
