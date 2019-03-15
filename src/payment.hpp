@@ -41,7 +41,6 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
   			 r.isPaid = true;
   		});
   		
-      _scheduleSend(eosAccount, campaignId);
       return;
   	}
 	}
@@ -59,7 +58,6 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
       r.isPaid = true;
     });
     
-    _scheduleSend(eosAccount, campaignId);
     return;
   }
 
