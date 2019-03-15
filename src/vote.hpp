@@ -1,4 +1,3 @@
-
 void scrugex::vote(name eosAccount, uint64_t campaignId, bool vote) {
   _assertPaused();
 	require_auth(eosAccount);
@@ -31,6 +30,9 @@ void scrugex::vote(name eosAccount, uint64_t campaignId, bool vote) {
 	eosio_assert(votingItem != voting.end(), "voting is not currently held");
 
 	voters_i voters(_self, scope);
+	auto item = voters.find(userId);
+	eosio_assert(item == voters.end(), "you have already voted");
+	
 	voters.emplace(_self, [&](auto& r) {
 		r.vote = vote;
 		r.userId = userId;
