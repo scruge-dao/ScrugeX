@@ -1,7 +1,6 @@
 void scrugex::take(name eosAccount, uint64_t campaignId) {
   require_auth(eosAccount);
 	_send(eosAccount, campaignId);
-  
 } // void take
 
 void scrugex::cancel(name eosAccount, uint64_t campaignId) {
@@ -29,8 +28,9 @@ void scrugex::cancel(name eosAccount, uint64_t campaignId) {
   
   contributions.erase(contributionItem);
   
-  _transfer(contributionItem->eosAccount, contributionItem->quantity, "ScrugeX: Contribution returned");
-  
+  if (contributionItem->quantity.amount > 0) {
+    _transfer(contributionItem->eosAccount, contributionItem->quantity, "ScrugeX: Contribution returned");
+  }
 } // void cancel
 
 void scrugex::send(name eosAccount, uint64_t campaignId) {
@@ -93,7 +93,7 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
   
   eosio_assert(false, "there is nothing to pay for");
 
-} // void scrugex::send
+} // void send
 
 void scrugex::pay(uint64_t campaignId) {
   _assertPaused();
@@ -142,4 +142,4 @@ void scrugex::pay(uint64_t campaignId) {
 	
 	eosio_assert(false, "no payment to make");
 
-} // void scrugex::startrefund
+} // void scrugex::pay
