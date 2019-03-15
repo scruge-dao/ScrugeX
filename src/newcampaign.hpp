@@ -64,6 +64,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	  information.emplace(_self, [&](auto& r) {
 	    r.campaignsCount = 1;
 	    r.isPaused = false;
+	    r.ramFund = asset(0, EOS_SYMBOL);
 	  });
 	}
 	else {

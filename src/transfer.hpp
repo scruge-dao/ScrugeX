@@ -63,13 +63,28 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
     contributions_i contributions(_self, scope);
     auto contributionItem = contributions.find(eosAccount.value);
     
+    // take ram comission  
+    auto investment = quantity;
+    
+    // only once
+    if (previous.amount == 0) { 
+      auto ramComission = _getRamPriceKB();
+      investment -= ramComission;
+      
+      information_i information(_self, _self.value);
+      auto infoItem = information.begin();
+      information.modify(infoItem, same_payer, [&](auto& r) {
+        r.ramFund += ramComission;
+      });
+    }
+    
     // upsert
     if (contributionItem != contributions.end()) {
       auto inUse = contributionItem->userId == userId;
       eosio_assert(inUse, "this eos account was used to contrubute by another scruge user");
     
       contributions.modify(contributionItem, same_payer, [&](auto& r) {
-        r.quantity += quantity;
+        r.quantity += investment;
       });
     }
     else {
@@ -83,7 +98,7 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
       contributions.emplace(_self, [&](auto& r) {
         r.userId = userId;
         r.eosAccount = eosAccount;
-        r.quantity = quantity;
+        r.quantity = investment;
         
         r.attemptedPayment = false;
         r.isPaid = false;
@@ -92,7 +107,7 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
   
   	// update raised in campaigns
     campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-      r.raised += quantity;
+      r.raised += investment;
     });
 	}
 	

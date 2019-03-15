@@ -47,6 +47,7 @@ private:
 	TABLE information {
 		uint64_t campaignsCount;
 		bool isPaused;
+		asset ramFund;
   
 		uint64_t primary_key() const { return 0; }
 	};
@@ -180,6 +181,25 @@ private:
 	typedef multi_index<"accounts"_n, account,
 		indexed_by<"identifier"_n, const_mem_fun<account, uint64_t,
       &account::identifier>>> accounts_i;
+      
+  // to request ram price
+  
+  struct exchange_state {
+    asset supply;
+
+    struct connector {
+       asset balance;
+       double weight = .5;
+    };
+
+    connector base;
+    connector quote;
+
+    uint64_t primary_key()const { return supply.symbol.raw(); }
+  };
+
+   typedef eosio::multi_index< "rammarket"_n, exchange_state > rammarket_i;
+  
   
 	// helper methods
 	void _pay(uint64_t campaignId);
@@ -196,6 +216,7 @@ private:
 	void _refund(uint64_t campaignId);
 	asset _getContributionQuantity(uint64_t scope, uint64_t userId);
 	void _assertPaused();
+	asset _getRamPriceKB();
 
   // refresh cycle methods
   enum RefreshAction: uint8_t { doneT = 0, done = 1, skip = 2, pass = 3 };

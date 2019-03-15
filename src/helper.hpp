@@ -273,3 +273,13 @@ void scrugex::_assertPaused() {
     eosio_assert(!infoItem->isPaused, "contract is paused");
   }
 } // void _assertPaused
+
+asset scrugex::_getRamPriceKB() {
+  static constexpr symbol ramcore_symbol = symbol(symbol_code("RAMCORE"), 4);
+  rammarket_i rammarket("eosio"_n, "eosio"_n.value);
+  const auto& market = rammarket.get(ramcore_symbol.raw(), "ram market does not exist");
+  auto priceB = (double)market.quote.balance.amount / ((double)market.base.balance.amount);
+  auto amount = priceB * 1024;
+  return asset(amount, EOS_SYMBOL);
+  
+} // void _getRamPrice
