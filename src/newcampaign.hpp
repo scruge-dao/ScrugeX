@@ -7,18 +7,23 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	require_auth(founderEosAccount);
 	
 	auto investmentSymbol = hardCap.symbol;
+	auto now = time_ms();
 	
 	eosio_assert(!kycEnabled, "kyc is not implemented yet");
 	
   eosio_assert(tokenContract != "eosio.token"_n && supplyForSale.symbol != EOS_SYMBOL, 
     "you can not raise money for EOS");
 	
-	// to-do validate arguments (make sure it's complete)
 	eosio_assert(softCap < hardCap, "hard cap should be higher than soft cap");
 	eosio_assert(milestones.size() > 0, "no milestones passed");
 	
+	eosio_assert(maxUserContributionPercent > 0, "max user contribution percent can not be 0%");
+	eosio_assert(maxUserContributionPercent < 100, "max user contribution percent can not be above 100%");
+	
 	eosio_assert(campaignDuration >= MIN_CAMPAIGN_DURATION, "campaign should be longer than 2 weeks");
 	eosio_assert(campaignDuration <= MAX_CAMPAIGN_DURATION, "campaign should be shorter than 8 weeks");
+	
+	eosio_assert(startTimestamp > now, "campaign can not start in the past");
 	
 	eosio_assert(supplyForSale.symbol.is_valid(), "invalid supply for sale");
 	eosio_assert(hardCap.symbol.is_valid(), "invalid hard cap");
