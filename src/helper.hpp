@@ -86,7 +86,7 @@ bool scrugex::_willRefundExcessiveFunds(uint64_t campaignId) {
       if (element * i + startSum < hardCap) {
         e = element;
   
-        uint64_t k = 10000000;
+        uint64_t k = 10'000'000;
         while (k > 0) {
           auto ka = asset(k, e.symbol);
           while (e * i + startSum < hardCap) {

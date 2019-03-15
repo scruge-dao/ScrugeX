@@ -6,7 +6,7 @@
 
 const eosio::symbol& EOS_SYMBOL = eosio::symbol{"EOS", 4};
 
-const uint64_t SECOND = 1000;
+const uint64_t SECOND = 1'000;
 const uint64_t MINUTE = 60 * SECOND;
 const uint64_t HOUR = 60 * MINUTE;
 const uint64_t DAY = 24 * HOUR;

@@ -15,7 +15,7 @@ bool is_number(const string& s) {
 }
 
 uint64_t time_ms() {
-	return current_time() / 1000;
+	return current_time() / 1'000;
 }
 
 uint64_t get_percent(uint64_t value, uint64_t percent) { 
