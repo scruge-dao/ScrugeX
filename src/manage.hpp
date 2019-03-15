@@ -49,6 +49,8 @@ void scrugex::buyram() {
   
   information_i information(_self, _self.value);
   auto& infoItem = *information.begin();
+  
+  eosio_assert(infoItem.ramFund.amount > 0, "ram fund is empty");
 
   action(
 		permission_level{ _self, "active"_n },
