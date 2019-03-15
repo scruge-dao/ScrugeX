@@ -46,7 +46,7 @@ void scrugex::vote(name eosAccount, uint64_t campaignId, bool vote) {
 		}
 	});
 	
-	if (votingItem->voters != campaignItem->backersCount) {
+	if (votingItem->voters == campaignItem->backersCount) {
 	  _scheduleRefresh(0);
 	}
 	

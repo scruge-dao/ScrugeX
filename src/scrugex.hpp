@@ -76,7 +76,6 @@ private:
 		uint64_t backersCount;
 		uint8_t currentMilestone;
 		bool kycEnabled;
-		// bool active;
 		
 		uint64_t primary_key() const { return campaignId; }
 	};
