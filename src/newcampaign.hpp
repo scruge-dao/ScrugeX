@@ -54,17 +54,6 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 		r.waitingEndTimestamp = 0;
 	});
 	
-  exchangeinfo_i exchangeinfo(_self, campaignId);
-  exchangeinfo.emplace(founderEosAccount, [&](auto& r) {
-    r.status = ExchangeStatus::inactive;
-		r.previousPrice = 0;
-		r.roundPrice = 0;
-		r.roundSellVolume = asset(0, supplyForSale.symbol);
-		r.investorsFund = asset(0, investmentSymbol);
-		r.sellEndTimestamp = 0;
-		r.priceTimestamp = 0;
-	});
-
 	// update campaigns count
 	information_i information(_self, _self.value);
 	auto infoItem = information.begin();

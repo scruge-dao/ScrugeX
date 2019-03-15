@@ -231,30 +231,6 @@ void scrugex::_startvote(uint64_t campaignId, uint8_t kind) {
 	});
 } // void _startvote
 
-
-void scrugex::_startExchange(uint64_t campaignId, uint64_t nextMilestoneId) {
-  exchangeinfo_i exchangeinfo(_self, campaignId);
-	auto exchangeItem = exchangeinfo.begin();
-	campaigns_i campaigns(_self, _self.value);
-	auto campaignItem = campaigns.find(campaignId);
-	
-	auto newPrice = exchangeItem->previousPrice;
-	if (newPrice == 0) {
-	  double pICO = (double)campaignItem->raised.amount / (double)campaignItem->supplyForSale.amount;
-	  newPrice = pICO * EXCHANGE_PRICE_MULTIPLIER;
-	}
-	
-  exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
-    r.milestoneId = nextMilestoneId;
-    r.status = ExchangeStatus::selling;
-    r.sellEndTimestamp = time_ms() + EXCHANGE_SELL_DURATION;
-    r.previousPrice = r.roundPrice;
-    r.roundPrice = newPrice * EXCHANGE_PRICE_MULTIPLIER;
-    r.roundSellVolume = asset(0, r.roundSellVolume.symbol);
-  });
-  
-} // void _startExchange
-
 void scrugex::_refund(uint64_t campaignId) {
   campaigns_i campaigns(_self, _self.value);
   auto campaignItem = campaigns.find(campaignId);
@@ -273,23 +249,6 @@ void scrugex::_refund(uint64_t campaignId) {
 	
 } // void _refund
 
-double scrugex::_updatePrice(uint64_t campaignId) {
-  auto now = time_ms();
-  exchangeinfo_i exchangeinfo(_self, campaignId);
-  auto exchangeItem = exchangeinfo.begin();
-  
-  // to-do calculate time
-  double newPrice = exchangeItem->roundPrice / 5; // to-do formula
-  
-  if (exchangeItem->priceTimestamp + EXCHANGE_PRICE_PERIOD < now) {
-    exchangeinfo.modify(exchangeItem, same_payer, [&](auto& r) {
-      r.priceTimestamp = now;
-      r.roundPrice = newPrice;
-    });
-  }
-  return newPrice;
-} // double _updatePrice
-
 asset scrugex::_getContributionQuantity(uint64_t scope, uint64_t userId) {
 	contributions_i contributions(_self, scope);
   auto index = contributions.get_index<"byuserid"_n>();
@@ -304,19 +263,3 @@ asset scrugex::_getContributionQuantity(uint64_t scope, uint64_t userId) {
 	}
 	return total;
 } // asset _getContributionQuantity
-
-// no exchanges with id 0 should exist, so 0 means none
-int8_t scrugex::_getLastCompleteExchangeId(uint64_t campaignId) {
-  exchangeinfo_i exchange(_self, campaignId);
-  auto exchangeItem = exchange.begin();
-	
-  if (exchangeItem == exchange.end() || exchangeItem->milestoneId == 0) {
-    return 0;
-  }
-  
-  if (exchangeItem->status == ExchangeStatus::inactive) {
-    return exchangeItem->milestoneId;
-  }
-  return exchangeItem->milestoneId - 1;
-  
-} // int8_t _getLastCompleteExchangeId

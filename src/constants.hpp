@@ -26,17 +26,8 @@ const uint64_t MIN_VOTING_DURATION = 3 * DAY;
 // duration of voting
 const uint64_t MAX_VOTING_DURATION = 7 * DAY;
 
-// sell window after voting
-const uint64_t EXCHANGE_SELL_DURATION = 15 * SECOND; // 3 * DAY;
-
-// multiply previous auction price to this value
-const double EXCHANGE_PRICE_MULTIPLIER = 5.;
-
 // default refresh period
 const uint64_t REFRESH_PERIOD = 5 * MINUTE;
-
-// duration to lower auction price 
-const uint64_t EXCHANGE_PRICE_PERIOD = 2 * SECOND;
 
 // minimum milestone duration
 const uint64_t MIN_MILESTONE_DURATION = 1; // 14 * DAY;

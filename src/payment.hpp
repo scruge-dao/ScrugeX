@@ -34,19 +34,6 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
             
         auto paymentQuantity = asset(paymentAmount, campaignItem.supplyForSale.symbol);
         _transfer(eosAccount, paymentQuantity, "ScrugeX: Tokens Distribution", campaignItem.tokenContract);
-        
-        // also distribute exchange fund 
-        exchangeinfo_i exchangeinfo(_self, campaignItem.campaignId);
-  			auto exchangeItem = exchangeinfo.begin();
-  			auto fund = exchangeItem->investorsFund;
-  			
-  			uint64_t fundPaymentAmount = (uint64_t) floor((double)exchangeItem->investorsFund.amount /
-            (double)campaignItem.raised.amount * (double)contributionItem->quantity.amount); 
-        
-        if (fundPaymentAmount > 0) {
-          auto fundPaymentQuantity = asset(fundPaymentAmount, exchangeItem->investorsFund.symbol);
-          _transfer(eosAccount, fundPaymentQuantity, "ScrugeX: Exchange Fund Payment");
-        }
       }
   		
   		contributions.modify(contributionItem, same_payer, [&](auto& r) {
@@ -75,71 +62,6 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
     _scheduleSend(eosAccount, campaignId);
     return;
   }
-	
-	// get last complete exchange id 
-	auto lastCompleteExchangeId = _getLastCompleteExchangeId(campaignId);
-	
-	// check sell orders
-	sellorders_i sellorders(_self, campaignId);
-	auto usersOrders = sellorders.get_index<"byuserid"_n>();
-	auto sellIndex = sellorders.get_index<"byuserid"_n>();
-  auto sellOrderItem = sellIndex.find(userId);
-  
-  while (sellOrderItem != sellIndex.end()) {
-    if (!sellOrderItem->isPaid && lastCompleteExchangeId >= sellOrderItem->milestoneId) {
-      const auto& orderItem = *sellOrderItem;
-      
-      if (orderItem.userId != userId) {
-        break;
-      }
-    
-      // auto item = sellorders.find(orderItem.key);
-      sellIndex.modify(sellOrderItem, same_payer, [&](auto& r) {
-        r.attemptedPayment = true;
-        r.isPaid = true;
-      });
-      
-      // send back unused tokens
-      if (orderItem.received.amount > 0) {
-        _transfer(orderItem.eosAccount, orderItem.received, "ScrugeX: Tokens Sold on Exchange");
-      }
-      
-      _scheduleSend(eosAccount, campaignId);
-      return;
-    }
-    sellOrderItem++;
-	}
-	
-	// check buy orders
-	buyorders_i buyorders(_self, campaignId);
-	auto notAttemptedBuyOrders = buyorders.get_index<"byuserid"_n>();
-	auto buyIndex = buyorders.get_index<"byuserid"_n>();
-  auto buyOrderItem = buyIndex.find(userId);
-	
-	while (buyOrderItem != buyIndex.end()) {
-    if (!buyOrderItem->isPaid && buyOrderItem->paymentReceived &&
-        lastCompleteExchangeId >= buyOrderItem->milestoneId) {
-      const auto& orderItem = *buyOrderItem;
-      
-      if (orderItem.userId != userId) {
-        break;
-      }
-    
-      buyIndex.modify(buyOrderItem, same_payer, [&](auto& r) {
-        r.attemptedPayment = true;
-        r.isPaid = true;
-      });
-      
-      asset diff = asset(orderItem.sum.amount - (uint64_t) ceil(orderItem.spent), orderItem.sum.symbol);
-      if (diff.amount > 0) {
-        _transfer(orderItem.eosAccount, diff, "ScrugeX: Tokens Purchased on Exchange");
-      }
-      
-      _scheduleSend(eosAccount, campaignId);
-      return;
-    }
-    buyOrderItem++;
-	}
 
 } // void scrugex::send
 
@@ -186,49 +108,5 @@ void scrugex::pay(uint64_t campaignId) {
 		_schedulePay(campaignId);
 		return;
 	}
-	
-	// get last complete exchange id
-	auto lastCompleteExchangeId = _getLastCompleteExchangeId(campaignId);
-	
-	// no exchanges were complete yet, there is no exchange with id 0
-	if (lastCompleteExchangeId == 0) { return; }
-	
-	// check sell orders
-	sellorders_i sellorders(_self, campaignId);
-	auto sellIndex = sellorders.get_index<"byap"_n>();
-	auto sellOrderItem = sellIndex.find(0);
-  
-  if (sellOrderItem != sellIndex.end() && 
-    !sellOrderItem->attemptedPayment && 
-    lastCompleteExchangeId >= sellOrderItem->milestoneId) {
-    
-    sellIndex.modify(sellOrderItem, same_payer, [&](auto& r) {
-      r.attemptedPayment = true;
-    });
-    
-    _scheduleSend(sellOrderItem->eosAccount, campaignId);
-    _schedulePay(campaignId);
-    return;
-  }
-	
-	// check buy orders
-	buyorders_i buyorders(_self, campaignId);
-	auto buyIndex = buyorders.get_index<"byap"_n>();
-	auto buyOrderItem = buyIndex.find(0);
-	
-	if (buyOrderItem != buyIndex.end() && 
-	    !buyOrderItem->attemptedPayment &&
-	    !buyOrderItem->paymentReceived &&
-	    
-    lastCompleteExchangeId >= buyOrderItem->milestoneId) {
-    
-    buyIndex.modify(buyOrderItem, same_payer, [&](auto& r) {
-      r.attemptedPayment = true;
-    });
-    
-    _scheduleSend(buyOrderItem->eosAccount, campaignId);
-    _schedulePay(campaignId);
-    return;
-	}
-	
+
 } // void scrugex::startrefund

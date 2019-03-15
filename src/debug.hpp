@@ -39,19 +39,6 @@ void scrugex::destroy() {
 		excessfunds_i excessfunds(_self, i);
 		auto e_item = excessfunds.begin();
 		while(e_item != excessfunds.end()) { e_item = excessfunds.erase(e_item); }
-		
-	  
-		sellorders_i sellorders(_self, i);
-		auto s_item = sellorders.begin();
-		while(s_item != sellorders.end()) { s_item = sellorders.erase(s_item); }
-		
-		exchangeinfo_i exchangeinfo(_self, i);
-		auto ex_item = exchangeinfo.begin();
-		while(ex_item != exchangeinfo.end()) { ex_item = exchangeinfo.erase(ex_item); }
-	
-		buyorders_i buyorders(_self, i);
-		auto b_item = buyorders.begin();
-		while(b_item != buyorders.end()) { b_item = buyorders.erase(b_item); }
 	}
 	
 } // void scrugex::destroy

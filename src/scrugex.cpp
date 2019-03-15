@@ -4,7 +4,6 @@
 #include "refresh.hpp"
 #include "transfer.hpp"
 #include "newcampaign.hpp"
-#include "exchange.hpp"
 #include "manage.hpp"
 #include "payment.hpp"
 #include "vote.hpp"
@@ -19,7 +18,6 @@ extern "C" {
 			switch (action) {
 				EOSIO_DISPATCH_HELPER(scrugex,
 						(newcampaign)(vote)(extend)(refresh)(send)(pay)(take)(refund)
-            (buy)(sell) 
 						(destroy))
 			}
 		}

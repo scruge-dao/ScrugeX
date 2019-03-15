@@ -33,15 +33,11 @@ public:
 	ACTION send(name eosAccount, uint64_t campaignId);
 	ACTION take(name eosAccount, uint64_t campaignId);
 	ACTION pay(uint64_t campaignId);
-	ACTION buy(name eosAccount, uint64_t campaignId, asset quantity, asset sum);
-	ACTION sell(name eosAccount, uint64_t campaignId, asset quantity);
 
 private:
 
 	enum Status: uint8_t { funding = 0, milestone = 1, activeVote = 2, waiting = 3,
 							 refunding = 4, distributing = 5 };
-	
-	enum ExchangeStatus: uint8_t { inactive = 0, selling = 1, buying = 2 };
 	
 	enum VoteKind: uint8_t { extendDeadline = 0, milestoneResult = 1 };
 	
@@ -148,76 +144,6 @@ private:
 		uint64_t primary_key() const { return userId; }
 	};
 	
-	TABLE exchangeinfo {
-	  uint64_t milestoneId;
-		uint8_t status;
-		double previousPrice;
-		double roundPrice;
-		asset roundSellVolume;
-		asset investorsFund;
-		uint64_t priceTimestamp;
-		uint64_t sellEndTimestamp;
-		
-		uint64_t primary_key() const { return 0; }
-	};
-	
-  TABLE sellorders {
-    uint64_t milestoneId;
-    uint64_t key;
-    name eosAccount;
-    uint64_t userId;
-    asset quantity;
-    uint64_t timestamp;
-    asset received;
-    
-		// distribution flags
-		bool attemptedPayment;  // did attemt payment
-		bool isPaid;            // payment was successful
- 
-    uint64_t primary_key() const { return key; }
-    uint64_t by_userId() const { return userId; }
-		uint64_t by_ap() const { return attemptedPayment ? 1 : 0; }
-  };
-
-  TABLE buyorders {
-    uint64_t milestoneId;
-    uint64_t key;
-    name eosAccount;
-    bool paymentReceived;
-    uint64_t userId;
-    asset quantity;
-    asset sum;
-    double price;
-    uint64_t timestamp;
-    asset purchased;
-    double spent;
-    
-		// distribution flags
-		bool attemptedPayment;  // did attemt payment
-		bool isPaid;            // payment was successful
- 
-    uint64_t primary_key() const { return key; }
-    uint64_t by_userId() const { return userId; }
-		uint64_t by_ap() const { return attemptedPayment ? 1 : 0; }
-    
-    uint64_t special_index() const {
-      
-      // index: milestoneId -> price -> timestamp
-      // 19 digit number
-      // 1) 2 digits for milestone id
-      // 2) 13 digits for reverse price (keeping 3 digits before and 10 after decimal place)
-      // 4) 4 digits for reverse key
-
-      uint64_t A = 1000000000000000000;
-      uint64_t B = 10000000000;
-      uint64_t C = 10000;
-      
-      return milestoneId * A + 
-              A - (uint64_t)(price * (double)B) % (B * 1000) * C + 
-              C - key;
-    }
-  };
-
 	// tables
 
 	typedef multi_index<"information"_n, information> information_i;
@@ -240,21 +166,6 @@ private:
 		indexed_by<"byamountdesc"_n, const_mem_fun<contribution, uint64_t, &contribution::by_amount_desc>>
 			> contributions_i;
 	
-	// exchange
-	
-  typedef multi_index<"exchangeinfo"_n, exchangeinfo> exchangeinfo_i;
-  
-  typedef multi_index<"sellorders"_n, sellorders,
-    indexed_by<"byuserid"_n, const_mem_fun<sellorders, uint64_t, &sellorders::by_userId>>,
-    indexed_by<"byap"_n, const_mem_fun<sellorders, uint64_t, &sellorders::by_ap>>
-		  > sellorders_i;
-  
-  typedef multi_index<"buyorders"_n, buyorders,
-    indexed_by<"specialindex"_n, const_mem_fun<buyorders, uint64_t, &buyorders::special_index>>,
-    indexed_by<"byuserid"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_userId>>,
-    indexed_by<"byap"_n, const_mem_fun<buyorders, uint64_t, &buyorders::by_ap>>
-      > buyorders_i;
-
 	// to access kyc/aml table
 	
 	struct account {
@@ -281,11 +192,8 @@ private:
 	uint64_t _verify(name eosAccount, bool kycEnabled);
 	void _stopvote(uint64_t campaignId);
 	void _startvote(uint64_t campaignId, uint8_t kind);
-  void _startExchange(uint64_t campaignId, uint64_t nextMilestoneId);
 	void _refund(uint64_t campaignId);
 	asset _getContributionQuantity(uint64_t scope, uint64_t userId);
-	double _updatePrice(uint64_t campaignId);
-	int8_t _getLastCompleteExchangeId(uint64_t campaignId);
 
   // refresh cycle methods
   enum RefreshAction: uint8_t { doneT = 0, done = 1, skip = 2, pass = 3 };
@@ -297,8 +205,5 @@ private:
   param _voting(const campaigns& campaignItem, campaigns_i& campaigns);
   param _extendDeadlineVoting(const voting& votingItem, const campaigns& campaignItem, campaigns_i& campaigns);
   param _milestoneVoting(const voting& votingItem, const campaigns& campaignItem, campaigns_i& campaigns);
-  param _runExchange(const campaigns& campaignItem, campaigns_i& campaigns);
-  param _closeSell(const campaigns& campaignItem, campaigns_i& campaigns);
-  param _canClose(const campaigns& campaignItem, campaigns_i& campaigns);
   
 }; // CONTRACT scrugex
