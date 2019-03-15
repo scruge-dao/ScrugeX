@@ -7,7 +7,7 @@ void scrugex::cancel(name eosAccount, uint64_t campaignId) {
   _assertPaused();
   require_auth(eosAccount);
   
-  uint64_t now = time_ms();  
+  uint64_t now = time_ms();
   
 	// fetch campaign
 	campaigns_i campaigns(_self, _self.value);
@@ -36,6 +36,8 @@ void scrugex::cancel(name eosAccount, uint64_t campaignId) {
 void scrugex::send(name eosAccount, uint64_t campaignId) {
   _assertPaused();
 	require_auth(_self);
+
+  bool isPaid = false;
 	
 	// fetch campaign
 	campaigns_i campaigns(_self, _self.value);
@@ -50,30 +52,28 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 		auto contributionItem = contributions.find(eosAccount.value);
 		
 		if (contributionItem != contributions.end() && !contributionItem->isPaid) {
-  		
-  		// if refunding (both not reached soft cap or milestone vote failed)
+      
       if (campaignItem.status == Status::refunding) {
-  		  uint64_t refundPercent = 100 - campaignItem.releasedPercent;
+        uint64_t refundPercent = 100 - campaignItem.releasedPercent;
         uint64_t paymentAmount = get_percent(contributionItem->quantity.amount, refundPercent);
         _transfer(eosAccount, asset(paymentAmount, campaignItem.hardCap.symbol), "ScrugeX: Refund for campaign");
       }
       else {
-        
         uint64_t paymentAmount = (uint64_t) floor((double)campaignItem.supplyForSale.amount /
             (double)campaignItem.raised.amount * (double)contributionItem->quantity.amount);
             
         auto paymentQuantity = asset(paymentAmount, campaignItem.supplyForSale.symbol);
         _transfer(eosAccount, paymentQuantity, "ScrugeX: Tokens Distribution", campaignItem.tokenContract);
       }
-  		
-  		contributions.modify(contributionItem, same_payer, [&](auto& r) {
-  			 r.attemptedPayment = true;
-  			 r.isPaid = true;
-  		});
-  		
-      return;
-  	}
-	}
+      
+      isPaid = true;
+      
+      contributions.modify(contributionItem, same_payer, [&](auto& r) {
+        r.attemptedPayment = true;
+        r.isPaid = true;
+      });
+    }
+  }
 	
 	// check excess funds
 	excessfunds_i excessfunds(_self, campaignId);
@@ -81,17 +81,17 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 	auto excessItem = excessIndex.find(eosAccount.value);
 	
   if (excessItem != excessIndex.end() && !excessItem->isPaid) {
+    
+    isPaid = true;
     _transfer(eosAccount, excessItem->quantity, "ScrugeX: Excessive Funding Return");
     
     excessIndex.modify(excessItem, same_payer, [&](auto& r) {
       r.attemptedPayment = true;
       r.isPaid = true;
     });
-    
-    return;
   }
   
-  eosio_assert(false, "there is nothing to pay for");
+  eosio_assert(isPaid, "there is nothing to pay for");
 
 } // void send
 
