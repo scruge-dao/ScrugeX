@@ -23,6 +23,10 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	eosio_assert(campaignDuration >= MIN_CAMPAIGN_DURATION, "campaign should be longer than 2 weeks");
 	eosio_assert(campaignDuration <= MAX_CAMPAIGN_DURATION, "campaign should be shorter than 8 weeks");
 	
+	eosio_assert(minUserContribution.symbol == softCap.symbol, "min contribution symbols mismatch");
+	eosio_assert(minUserContribution < get_percent(hardCap, maxUserContributionPercent),
+	   "min contribution should not be lower than max");
+	
 	eosio_assert(startTimestamp > now, "campaign can not start in the past");
 	
 	eosio_assert(supplyForSale.symbol.is_valid(), "invalid supply for sale");
