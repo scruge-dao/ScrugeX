@@ -29,6 +29,8 @@ void scrugex::cancel(name eosAccount, uint64_t campaignId) {
   
   contributions.erase(contributionItem);
   
+  _transfer(contributionItem->eosAccount, contributionItem->quantity, "ScrugeX: Contribution returned");
+  
 } // void cancel
 
 void scrugex::send(name eosAccount, uint64_t campaignId) {
