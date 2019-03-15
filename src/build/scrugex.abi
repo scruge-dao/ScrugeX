@@ -1,87 +1,7 @@
 {
-    "____comment": "This file was generated with eosio-abigen. DO NOT EDIT Wed Mar 13 10:49:34 2019",
+    "____comment": "This file was generated with eosio-abigen. DO NOT EDIT Fri Mar 15 08:47:50 2019",
     "version": "eosio::abi/1.1",
     "structs": [
-        {
-            "name": "buy",
-            "base": "",
-            "fields": [
-                {
-                    "name": "eosAccount",
-                    "type": "name"
-                },
-                {
-                    "name": "campaignId",
-                    "type": "uint64"
-                },
-                {
-                    "name": "quantity",
-                    "type": "asset"
-                },
-                {
-                    "name": "sum",
-                    "type": "asset"
-                }
-            ]
-        },
-        {
-            "name": "buyorders",
-            "base": "",
-            "fields": [
-                {
-                    "name": "milestoneId",
-                    "type": "uint64"
-                },
-                {
-                    "name": "key",
-                    "type": "uint64"
-                },
-                {
-                    "name": "eosAccount",
-                    "type": "name"
-                },
-                {
-                    "name": "paymentReceived",
-                    "type": "bool"
-                },
-                {
-                    "name": "userId",
-                    "type": "uint64"
-                },
-                {
-                    "name": "quantity",
-                    "type": "asset"
-                },
-                {
-                    "name": "sum",
-                    "type": "asset"
-                },
-                {
-                    "name": "price",
-                    "type": "float64"
-                },
-                {
-                    "name": "timestamp",
-                    "type": "uint64"
-                },
-                {
-                    "name": "purchased",
-                    "type": "asset"
-                },
-                {
-                    "name": "spent",
-                    "type": "float64"
-                },
-                {
-                    "name": "attemptedPayment",
-                    "type": "bool"
-                },
-                {
-                    "name": "isPaid",
-                    "type": "bool"
-                }
-            ]
-        },
         {
             "name": "campaigns",
             "base": "",
@@ -165,10 +85,6 @@
                 {
                     "name": "kycEnabled",
                     "type": "bool"
-                },
-                {
-                    "name": "active",
-                    "type": "bool"
                 }
             ]
         },
@@ -222,44 +138,6 @@
                 {
                     "name": "isPaid",
                     "type": "bool"
-                }
-            ]
-        },
-        {
-            "name": "exchangeinfo",
-            "base": "",
-            "fields": [
-                {
-                    "name": "milestoneId",
-                    "type": "uint64"
-                },
-                {
-                    "name": "status",
-                    "type": "uint8"
-                },
-                {
-                    "name": "previousPrice",
-                    "type": "float64"
-                },
-                {
-                    "name": "roundPrice",
-                    "type": "float64"
-                },
-                {
-                    "name": "roundSellVolume",
-                    "type": "asset"
-                },
-                {
-                    "name": "investorsFund",
-                    "type": "asset"
-                },
-                {
-                    "name": "priceTimestamp",
-                    "type": "uint64"
-                },
-                {
-                    "name": "sellEndTimestamp",
-                    "type": "uint64"
                 }
             ]
         },
@@ -399,66 +277,6 @@
             ]
         },
         {
-            "name": "sell",
-            "base": "",
-            "fields": [
-                {
-                    "name": "eosAccount",
-                    "type": "name"
-                },
-                {
-                    "name": "campaignId",
-                    "type": "uint64"
-                },
-                {
-                    "name": "quantity",
-                    "type": "asset"
-                }
-            ]
-        },
-        {
-            "name": "sellorders",
-            "base": "",
-            "fields": [
-                {
-                    "name": "milestoneId",
-                    "type": "uint64"
-                },
-                {
-                    "name": "key",
-                    "type": "uint64"
-                },
-                {
-                    "name": "eosAccount",
-                    "type": "name"
-                },
-                {
-                    "name": "userId",
-                    "type": "uint64"
-                },
-                {
-                    "name": "quantity",
-                    "type": "asset"
-                },
-                {
-                    "name": "timestamp",
-                    "type": "uint64"
-                },
-                {
-                    "name": "received",
-                    "type": "asset"
-                },
-                {
-                    "name": "attemptedPayment",
-                    "type": "bool"
-                },
-                {
-                    "name": "isPaid",
-                    "type": "bool"
-                }
-            ]
-        },
-        {
             "name": "send",
             "base": "",
             "fields": [
@@ -572,11 +390,6 @@
     "types": [],
     "actions": [
         {
-            "name": "buy",
-            "type": "buy",
-            "ricardian_contract": ""
-        },
-        {
             "name": "destroy",
             "type": "destroy",
             "ricardian_contract": ""
@@ -607,11 +420,6 @@
             "ricardian_contract": ""
         },
         {
-            "name": "sell",
-            "type": "sell",
-            "ricardian_contract": ""
-        },
-        {
             "name": "send",
             "type": "send",
             "ricardian_contract": ""
@@ -628,13 +436,6 @@
         }
     ],
     "tables": [
-        {
-            "name": "buyorders",
-            "type": "buyorders",
-            "index_type": "i64",
-            "key_names": [],
-            "key_types": []
-        },
         {
             "name": "campaigns",
             "type": "campaigns",
@@ -657,13 +458,6 @@
             "key_types": []
         },
         {
-            "name": "exchangeinfo",
-            "type": "exchangeinfo",
-            "index_type": "i64",
-            "key_names": [],
-            "key_types": []
-        },
-        {
             "name": "information",
             "type": "information",
             "index_type": "i64",
@@ -673,13 +467,6 @@
         {
             "name": "milestones",
             "type": "milestones",
-            "index_type": "i64",
-            "key_names": [],
-            "key_types": []
-        },
-        {
-            "name": "sellorders",
-            "type": "sellorders",
             "index_type": "i64",
             "key_names": [],
             "key_types": []
