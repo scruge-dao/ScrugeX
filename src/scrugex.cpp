@@ -17,8 +17,10 @@ extern "C" {
 		if (code == receiver) {
 			switch (action) {
 				EOSIO_DISPATCH_HELPER(scrugex,
-						(pause)(newcampaign)(vote)(extend)(refresh)(send)(pay)(take)(refund)
-						(zdestroy)(buyram))
+						(newcampaign)(extend)(refund)
+						(vote)(send)(pay)(take)(cancel)
+						(buyram)(pause)(refresh)
+						(zdestroy))
 			}
 		}
 		else if (action == "transfer"_n.value && code != receiver) {

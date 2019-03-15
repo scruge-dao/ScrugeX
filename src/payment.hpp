@@ -2,7 +2,34 @@ void scrugex::take(name eosAccount, uint64_t campaignId) {
   require_auth(eosAccount);
 	_send(eosAccount, campaignId);
   
-} // void scrugex::take
+} // void take
+
+void scrugex::cancel(name eosAccount, uint64_t campaignId) {
+  _assertPaused();
+  require_auth(eosAccount);
+  
+  uint64_t now = time_ms();  
+  
+	// fetch campaign
+	campaigns_i campaigns(_self, _self.value);
+	auto campaignItem = campaigns.find(campaignId);
+	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
+	eosio_assert(now < campaignItem->endTimestamp, "campaign has ended");
+  eosio_assert(campaignItem->status == Status::funding, "campaign is not running");
+
+  contributions_i contributions(_self, campaignId);
+  auto contributionItem = contributions.find(eosAccount.value);
+  
+  eosio_assert(contributionItem != contributions.end(), "you did not contribute to this campaign");
+  
+  campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+    r.backersCount -= 1;
+    r.raised -= contributionItem->quantity;
+  });
+  
+  contributions.erase(contributionItem);
+  
+} // void cancel
 
 void scrugex::send(name eosAccount, uint64_t campaignId) {
   _assertPaused();

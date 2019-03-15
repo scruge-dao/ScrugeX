@@ -35,6 +35,7 @@ public:
 	ACTION pay(uint64_t campaignId);
 	ACTION pause(bool value);
 	ACTION buyram();
+	ACTION cancel(name eosAccount, uint64_t campaignId);
 
 private:
 

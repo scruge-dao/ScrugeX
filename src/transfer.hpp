@@ -11,7 +11,7 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	eosio_assert(memo != "", "incorrectly formatted memo");
 	eosio_assert(is_number(memo), "campaignId is a number");
 
-	uint64_t time = time_ms();
+	uint64_t now = time_ms();
 	auto campaignId = stoull(memo);
 	auto eosAccount = from;
 
@@ -20,7 +20,6 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	auto campaignItem = campaigns.find(campaignId);
 	eosio_assert(campaignItem != campaigns.end(), "campaign does not exist");
 
-	auto scope = campaignItem->campaignId;
 	auto code = name(get_code());
 	
 	// founder is putting money in escrow
@@ -42,8 +41,8 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
     // check token contract
     eosio_assert(code == "eosio.token"_n, "you have to use the system EOS token");
     
-    eosio_assert(time > campaignItem->startTimestamp, "campaign has not started yet");
-    eosio_assert(time < campaignItem->endTimestamp, "campaign has ended");
+    eosio_assert(now > campaignItem->startTimestamp, "campaign has not started yet");
+    eosio_assert(now < campaignItem->endTimestamp, "campaign has ended");
     eosio_assert(campaignItem->status == Status::funding, "campaign is not running");
     eosio_assert(campaignItem->tokensReceived == true, "campaign has not been supplied with tokens to sale");
     
@@ -51,7 +50,7 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
     uint64_t userId = _verify(eosAccount, campaignItem->kycEnabled);
     
     // check if allowed to invest this amount
-    asset previous = _getContributionQuantity(scope, userId);
+    asset previous = _getContributionQuantity(campaignId, userId);
     asset total = previous + quantity;
     
     asset max = get_percent(campaignItem->hardCap, campaignItem->maxUserContributionPercent);
@@ -60,7 +59,7 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
     eosio_assert(min < total, "you can not contribute this little");
       
     // upsert contribution
-    contributions_i contributions(_self, scope);
+    contributions_i contributions(_self, campaignId);
     auto contributionItem = contributions.find(eosAccount.value);
     
     // take ram comission  
@@ -102,7 +101,7 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
         
         r.attemptedPayment = false;
         r.isPaid = false;
-        });
+      });
     }
   
   	// update raised in campaigns
