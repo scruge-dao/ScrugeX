@@ -60,6 +60,8 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
     
     return;
   }
+  
+  eosio_assert(false, "there is nothing to pay for");
 
 } // void scrugex::send
 
@@ -106,5 +108,7 @@ void scrugex::pay(uint64_t campaignId) {
 		_schedulePay(campaignId);
 		return;
 	}
+	
+	eosio_assert(false, "no payment to make");
 
 } // void scrugex::startrefund
