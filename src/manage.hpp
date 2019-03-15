@@ -43,3 +43,21 @@ void scrugex::pause(bool value) {
 	  });
 	}
 } // void pause
+
+void scrugex::buyram() {
+  require_auth(_self);
+  
+  information_i information(_self, _self.value);
+  auto& infoItem = *information.begin();
+
+  action(
+		permission_level{ _self, "active"_n },
+		"eosio"_n, "buyram"_n,
+		make_tuple(_self, _self, infoItem.ramFund)
+	).send();
+	
+  information.modify(infoItem, same_payer, [&](auto& r) {
+    r.ramFund = asset(0, EOS_SYMBOL);
+  });
+  
+} // void buyram
