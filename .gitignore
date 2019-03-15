@@ -39,5 +39,5 @@
 
 # Python
 __pycache__
-src/scrugex.abi
 *.tmp
+src/build/scrugex.abi
