@@ -7,6 +7,8 @@ void scrugex::_pay(uint64_t campaignId) {
 } // void _pay
 
 void scrugex::_transfer(name account, asset quantity, string memo, name contract) {
+  _assertPaused();
+  
 	action(
 		permission_level{ _self, "active"_n },
 		contract, "transfer"_n,
@@ -263,3 +265,11 @@ asset scrugex::_getContributionQuantity(uint64_t scope, uint64_t userId) {
 	}
 	return total;
 } // asset _getContributionQuantity
+
+void scrugex::_assertPaused() {
+  information_i information(_self, _self.value);
+  auto infoItem = information.begin();
+  if (information.begin() != information.end()) {
+    eosio_assert(!infoItem->isPaused, "contract is paused");
+  }
+} // void _assertPaused

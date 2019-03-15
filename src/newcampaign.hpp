@@ -3,6 +3,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 		uint64_t maxUserContributionPercent, uint64_t minUserContributionPercent,
 		uint64_t startTimestamp, uint64_t campaignDuration, vector<milestoneInfo> milestones) {
 
+  _assertPaused();
 	require_auth(founderEosAccount);
 	
 	auto investmentSymbol = hardCap.symbol;
@@ -60,8 +61,9 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	uint64_t scope = 0;
 	
 	if (information.begin() == information.end()) {
-	  information.emplace(founderEosAccount, [&](auto& r) {
+	  information.emplace(_self, [&](auto& r) {
 	    r.campaignsCount = 1;
+	    r.isPaused = false;
 	  });
 	}
 	else {

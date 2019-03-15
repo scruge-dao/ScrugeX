@@ -218,6 +218,7 @@ param _milestoneVoting(const voting& votingItem, const campaigns& campaignItem, 
 } // PARAM _milestoneVoting
 
 void scrugex::refresh() {
+  _assertPaused();
 	require_auth(_self);
 	
 	INIT

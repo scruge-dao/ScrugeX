@@ -1,5 +1,7 @@
 void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	if (to != _self) { return; }
+	
+	_assertPaused();
 	require_auth(from);
 
 	// check transfer

@@ -33,6 +33,7 @@ public:
 	ACTION send(name eosAccount, uint64_t campaignId);
 	ACTION take(name eosAccount, uint64_t campaignId);
 	ACTION pay(uint64_t campaignId);
+	ACTION pause(bool value);
 
 private:
 
@@ -45,7 +46,8 @@ private:
 
 	TABLE information {
 		uint64_t campaignsCount;
-
+		bool isPaused;
+  
 		uint64_t primary_key() const { return 0; }
 	};
 
@@ -193,6 +195,7 @@ private:
 	void _startvote(uint64_t campaignId, uint8_t kind);
 	void _refund(uint64_t campaignId);
 	asset _getContributionQuantity(uint64_t scope, uint64_t userId);
+	void _assertPaused();
 
   // refresh cycle methods
   enum RefreshAction: uint8_t { doneT = 0, done = 1, skip = 2, pass = 3 };

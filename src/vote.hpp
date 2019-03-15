@@ -1,5 +1,6 @@
 
 void scrugex::vote(name eosAccount, uint64_t campaignId, bool vote) {
+  _assertPaused();
 	require_auth(eosAccount);
 
   campaigns_i campaigns(_self, _self.value);

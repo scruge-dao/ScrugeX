@@ -1,4 +1,5 @@
 void scrugex::extend(uint64_t campaignId) {
+  _assertPaused();
 	campaigns_i campaigns(_self, _self.value);
 	auto campaignItem = campaigns.find(campaignId);
 	
@@ -11,6 +12,7 @@ void scrugex::extend(uint64_t campaignId) {
 
 
 void scrugex::refund(uint64_t campaignId) {
+  _assertPaused();
 	campaigns_i campaigns(_self, _self.value);
 	auto campaignItem = campaigns.find(campaignId);
 	
@@ -21,3 +23,23 @@ void scrugex::refund(uint64_t campaignId) {
 	_refund(campaignItem->campaignId);
 
 } // void scrugex::refund
+
+void scrugex::pause(bool value) {
+  require_auth(_self);
+  
+	information_i information(_self, _self.value);
+	auto infoItem = information.begin();
+	
+	if (information.begin() == information.end()) {
+	  information.emplace(_self, [&](auto& r) {
+	    r.campaignsCount = 0;
+	    r.isPaused = value;
+	  });
+	}
+	else {
+	  eosio_assert(infoItem->isPaused != value, "contract is already in this state");
+	  information.modify(information.begin(), same_payer, [&](auto& r) {
+	    r.isPaused = value;
+	  });
+	}
+} // void pause

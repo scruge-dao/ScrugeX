@@ -5,6 +5,7 @@ void scrugex::take(name eosAccount, uint64_t campaignId) {
 } // void scrugex::take
 
 void scrugex::send(name eosAccount, uint64_t campaignId) {
+  _assertPaused();
 	require_auth(_self);
 	
 	// fetch campaign
@@ -66,6 +67,7 @@ void scrugex::send(name eosAccount, uint64_t campaignId) {
 } // void scrugex::send
 
 void scrugex::pay(uint64_t campaignId) {
+  _assertPaused();
 	require_auth(_self);
 	
 	// fetch campaign

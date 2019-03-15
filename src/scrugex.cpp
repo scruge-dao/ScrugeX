@@ -17,7 +17,7 @@ extern "C" {
 		if (code == receiver) {
 			switch (action) {
 				EOSIO_DISPATCH_HELPER(scrugex,
-						(newcampaign)(vote)(extend)(refresh)(send)(pay)(take)(refund)
+						(pause)(newcampaign)(vote)(extend)(refresh)(send)(pay)(take)(refund)
 						(zdestroy))
 			}
 		}
