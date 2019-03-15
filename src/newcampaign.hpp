@@ -14,18 +14,11 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
   eosio_assert(tokenContract != "eosio.token"_n && supplyForSale.symbol != EOS_SYMBOL, 
     "you can not raise money for EOS");
 	
-	eosio_assert(softCap < hardCap, "hard cap should be higher than soft cap");
-	eosio_assert(milestones.size() > 0, "no milestones passed");
-	
 	eosio_assert(maxUserContributionPercent > 0, "max user contribution percent can not be 0%");
 	eosio_assert(maxUserContributionPercent < 100, "max user contribution percent can not be above 100%");
 	
 	eosio_assert(campaignDuration >= MIN_CAMPAIGN_DURATION, "campaign should be longer than 2 weeks");
 	eosio_assert(campaignDuration <= MAX_CAMPAIGN_DURATION, "campaign should be shorter than 8 weeks");
-	
-	eosio_assert(minUserContribution.symbol == softCap.symbol, "min contribution symbols mismatch");
-	eosio_assert(minUserContribution < get_percent(hardCap, maxUserContributionPercent),
-	   "min contribution should not be lower than max");
 	
 	eosio_assert(startTimestamp > now, "campaign can not start in the past");
 	
@@ -35,6 +28,13 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	
 	eosio_assert(hardCap.symbol == softCap.symbol, "cap symbols mismatch");
 	eosio_assert(hardCap.symbol == EOS_SYMBOL, "only EOS can be used to receive investments");
+	
+	eosio_assert(softCap < hardCap, "hard cap should be higher than soft cap");
+	eosio_assert(milestones.size() > 0, "no milestones passed");
+	
+	eosio_assert(minUserContribution.symbol == softCap.symbol, "min contribution symbols mismatch");
+	eosio_assert(minUserContribution < get_percent(hardCap, maxUserContributionPercent),
+	   "min contribution should not be lower than max");
 	
 	eosio_assert(initialFundsReleasePercent <= 25,
 		"initial funds release can not be higher than 25%");
