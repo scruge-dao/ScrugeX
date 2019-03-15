@@ -54,8 +54,8 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
     asset total = previous + quantity;
     
     asset max = get_percent(campaignItem->hardCap, campaignItem->maxUserContributionPercent);
-    eosio_assert(max > total, "you can not contribute this much");
-    eosio_assert(campaignItem->minUserContribution < total, "you can not contribute this little");
+    eosio_assert(max >= total, "you can not contribute this much");
+    eosio_assert(campaignItem->minUserContribution <= total, "you can not contribute such small amount");
     
     // upsert contribution
     contributions_i contributions(_self, campaignId);
