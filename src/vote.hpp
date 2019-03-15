@@ -27,7 +27,9 @@ void scrugex::vote(name eosAccount, uint64_t campaignId, bool vote) {
 		votingItem++;
 	}
 
+  auto now = time_ms();
 	eosio_assert(votingItem != voting.end(), "voting is not currently held");
+  eosio_assert(votingItem->endTimestamp > now, "voting is not currently held");
 
 	voters_i voters(_self, scope);
 	auto item = voters.find(userId);

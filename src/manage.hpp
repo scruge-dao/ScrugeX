@@ -10,7 +10,6 @@ void scrugex::extend(uint64_t campaignId) {
 	
 } // void scrugex::extend
 
-
 void scrugex::refund(uint64_t campaignId) {
   _assertPaused();
 	campaigns_i campaigns(_self, _self.value);
