@@ -1,6 +1,7 @@
 // methods for debug purposes
 
 void scrugex::zdestroy() {
+  
 	require_auth(_self);
 	
 	// get campaigns count
@@ -13,7 +14,11 @@ void scrugex::zdestroy() {
 
 	information_i table(_self, _self.value);
 	auto item = table.begin();
-	while(item != table.end()) { item = table.erase(item); }
+	if (item != table.end()) { 
+	  table.modify(item, same_payer, [&](auto& r) {
+      r.campaignsCount = 0;
+	  });
+	}
 
 	campaigns_i campaigns(_self, _self.value);
 	auto ca_item = campaigns.begin();
