@@ -1,2 +1,4 @@
 #!/bin/bash
-python3 simple.py 
+python simple.py &&
+python newcampaign.py &&
+python invest.py

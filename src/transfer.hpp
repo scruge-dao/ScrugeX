@@ -42,9 +42,9 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
     eosio_assert(code == "eosio.token"_n, "you have to use the system EOS token");
     
     eosio_assert(now > campaignItem->startTimestamp, "campaign has not started yet");
+    eosio_assert(campaignItem->tokensReceived, "campaign has not been supplied with tokens to sale");
     eosio_assert(now < campaignItem->endTimestamp, "campaign has ended");
     eosio_assert(campaignItem->status == Status::funding, "campaign is not running");
-    eosio_assert(campaignItem->tokensReceived == true, "campaign has not been supplied with tokens to sale");
     
     // get userId from kyc or eosAccount
     uint64_t userId = _verify(eosAccount, campaignItem->kycEnabled);

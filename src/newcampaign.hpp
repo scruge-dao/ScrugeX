@@ -98,6 +98,9 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 		eosio_assert(milestone.fundsReleasePercent <= 25,
 		  "milestone funds release can not be higher than 25%");
 
+		eosio_assert(milestone.fundsReleasePercent > 0,
+		  "milestone funds release can not be 0%");
+
 		totalFundsRelease += milestone.fundsReleasePercent;
 
 		eosio_assert(totalFundsRelease <= 100,

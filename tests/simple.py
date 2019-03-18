@@ -20,13 +20,11 @@ class Test(unittest.TestCase):
 
 	@classmethod
 	def setUpClass(cls):
-		SCENARIO("Test newproject action")
+		SCENARIO("Test campaign flow")
 		reset()
 
 		create_master_account("master")
 		create_account("founder", master, "founder")
-
-		key = CreateKey(is_verbose=False)
 
 		# Token
 
@@ -34,37 +32,19 @@ class Test(unittest.TestCase):
 		create_account("token", master, "token")
 
 		token_contract = Contract(eosio_token, "02_eosio_token")
-		if not token_contract.is_built():
-			token_contract.build()
-		token_contract.deploy()
+		deploy(token_contract)
 
 		token_contract = Contract(token, "02_eosio_token")
-		if not token_contract.is_built():
-			token_contract.build()
-		token_contract.deploy()
+		deploy(token_contract)
 
 		# ScrugeX
 
+		key = CreateKey(is_verbose=False)
 		create_account("eosioscrugex", master, "eosioscrugex", key)
-		eosioscrugex.set_account_permission(
-			Permission.ACTIVE,
-			{
-					"threshold" : 1,
-					"keys" : [{ "key": key.key_public, "weight": 1 }],
-					"accounts": [{
-						"permission": {
-							"actor": "eosioscrugex",
-							"permission": "eosio.code"
-						},
-						"weight": 1
-					}],
-				},
-			Permission.OWNER, (eosioscrugex, Permission.OWNER))
+		perm(eosioscrugex, key)
 
 		contract = Contract(eosioscrugex, "ScrugeX/src")
-		if not contract.is_built():
-			contract.build()
-		contract.deploy()
+		deploy(contract)
 
 		# Distribute tokens
 
@@ -83,11 +63,7 @@ class Test(unittest.TestCase):
 	# tests
 
 	def test(self):
-		newcampaign(eosioscrugex, founder,
-			supply="100.0000 TEST", token="token",
-			softCap="10.0000 EOS", hardCap="20.0000 EOS", initial=25,
-			minContrib="0.0010 EOS", maxContrib=35, duration=8000)
-		
+		newcampaign(eosioscrugex, founder)
 		transfer(token, founder, eosioscrugex, "100.0000 TEST", "0")
 
 		sleep(2)

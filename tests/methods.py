@@ -7,6 +7,27 @@ investors = ["investora", "investorb", "investorc", "investord", "investore", "i
 
 # methods
 
+def deploy(contract):
+	if not contract.is_built():
+		contract.build()
+	contract.deploy()
+
+def perm(eosioscrugex, key):
+	eosioscrugex.set_account_permission(
+		Permission.ACTIVE,
+		{
+				"threshold" : 1,
+				"keys" : [{ "key": key.key_public, "weight": 1 }],
+				"accounts": [{
+					"permission": {
+						"actor": "eosioscrugex",
+						"permission": "eosio.code"
+					},
+					"weight": 1
+				}],
+			},
+		Permission.OWNER, (eosioscrugex, Permission.OWNER))
+
 def create_issue(contract, to, symbol):
 	contract.push_action("create",
 		{
@@ -32,13 +53,18 @@ def transfer(contract, fromAccount, to, quantity, memo):
 		},
 		permission=[(fromAccount, Permission.ACTIVE)])
 
+def timeMs():
+	return int(time.time()*1000.0)
+
 def newcampaign(eosioscrugex, founder,
 	supply="100.0000 TEST", token="token",
 	softCap="10.0000 EOS", hardCap="20.0000 EOS", initial=25,
-	minContrib="0.0010 EOS", maxContrib=35, duration=8000, milestones=None):
+	minContrib="0.0010 EOS", maxContrib=35, start=None, duration=8000, milestones=None):
 
-	timestamp = int(time.time()*1000.0)
 	SECOND = 1000
+
+	if start == None:
+		start = timeMs() + SECOND
 
 	if milestones == None:
 		milestones = [
@@ -57,7 +83,7 @@ def newcampaign(eosioscrugex, founder,
 			"kycEnabled": False,
 			"minUserContribution": minContrib,
 			"maxUserContributionPercent": maxContrib, # 7 EOS
-			"startTimestamp": timestamp + SECOND,
+			"startTimestamp": start,
 			"campaignDuration": duration,
 			"milestones": milestones
 		},
@@ -81,15 +107,6 @@ def send(eosioscrugex, account):
 		},
 		permission=[(eosioscrugex, Permission.ACTIVE)])
 
-def sell(eosioscrugex, account, quantity):
-	eosioscrugex.push_action("sell", 
-		{
-			"eosAccount": account,
-			"campaignId": 0,
-			"quantity": quantity
-		},
-		permission=[(account, Permission.ACTIVE)])
-
 def take(eosioscrugex, account):
 	eosioscrugex.push_action("take", 
 		{
@@ -98,13 +115,11 @@ def take(eosioscrugex, account):
 		},
 		permission=[(account, Permission.ACTIVE)])
 
-def buy(eosioscrugex, account, quantity, summ):
-	eosioscrugex.push_action("buy", 
+def cancel(eosioscrugex, account, campaignId=0):
+	eosioscrugex.push_action("cancel",
 		{
 			"eosAccount": account,
-			"campaignId": 0,
-			"quantity": quantity,
-			"sum": summ
+			"campaignId": campaignId
 		},
 		permission=[(account, Permission.ACTIVE)])
 
@@ -129,7 +144,9 @@ def assertRaisesMessage(self, message, func):
 	with self.assertRaises(Error) as c:
 		func()
 	self.assertIn(message, c.exception.message)
+	print("+ Exception raised: \"%s\"" % message)
 
 def assertRaises(self, func):
 	with self.assertRaises(Error):
 		func()
+	print("+ Exception raised")
