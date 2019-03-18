@@ -128,6 +128,13 @@ class Test(unittest.TestCase):
 		# check tokens received
 		self.assertGreater(balance(token, investora), 14)
 
+		# check ram fund
+		self.assertGreater(amount(table(eosioscrugex, "information", element="ramFund")), 0)
+
+		# buy ram
+		buyram(eosioscrugex)
+		self.assertEqual(amount(table(eosioscrugex, "information", element="ramFund")), 0)
+
 
 
 # main

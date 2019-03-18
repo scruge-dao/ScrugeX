@@ -5,7 +5,10 @@ import time
 
 investors = ["investora", "investorb", "investorc", "investord", "investore", "investorf", "investorg"]
 
-# methods
+def timeMs():
+	return int(time.time()*1000.0)
+
+# actions
 
 def deploy(contract):
 	if not contract.is_built():
@@ -52,9 +55,6 @@ def transfer(contract, fromAccount, to, quantity, memo):
 			"memo": memo
 		},
 		permission=[(fromAccount, Permission.ACTIVE)])
-
-def timeMs():
-	return int(time.time()*1000.0)
 
 def newcampaign(eosioscrugex, founder,
 	supply="100.0000 TEST", token="token",
@@ -124,12 +124,27 @@ def cancel(eosioscrugex, account, campaignId=0):
 		permission=[(account, Permission.ACTIVE)])
 
 def refresh(eosioscrugex):
-	eosioscrugex.push_action("refresh", 
-		"[]",
-		permission=[(eosioscrugex, Permission.ACTIVE)])
+	eosioscrugex.push_action("refresh", "[]", permission=[(eosioscrugex, Permission.ACTIVE)])
+
+def buyram(eosioscrugex):
+	eosioscrugex.push_action("buyram", "[]", permission=[(eosioscrugex, Permission.ACTIVE)])
+
+# requests
 
 def balance(token, account):
-	return float(token.table("accounts", account).json["rows"][0]["balance"].split(" ")[0])
+	return amount(token.table("accounts", account).json["rows"][0]["balance"])
+
+def amount(quantity):
+	return float(quantity.split(" ")[0])
+
+def table(contract, table, scope=None, row=0, element=None):
+	if scope == None:
+		scope = contract
+	data = contract.table(table, scope).json["rows"][0]
+	if element != None:
+		return data[element]
+	else:
+		return data
 
 # assert
 
