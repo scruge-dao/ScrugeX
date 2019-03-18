@@ -20,7 +20,7 @@ class Test(unittest.TestCase):
 
 	@classmethod
 	def setUpClass(cls):
-		SCENARIO("Test invest action")
+		SCENARIO("Test transfer action")
 		reset()
 
 		create_master_account("master")
@@ -55,6 +55,7 @@ class Test(unittest.TestCase):
 
 		create_account("investora", master, "investora")
 		transfer(eosio_token, master, investora, "1000000.0000 EOS", "")
+		transfer(eosio_token, master, founder, "10000.0000 EOS", "")
 		transfer(token, founder, investora, "1000000.0000 TEST", "")
 
 
@@ -65,21 +66,45 @@ class Test(unittest.TestCase):
 
 	def test_invest(self):
 
-		start = timeMs() + 3000
-		newcampaign(eosioscrugex, founder, duration=60000, start=start) # 0
+		newcampaign(eosioscrugex, founder, duration=60000, start=timeMs() + 5000) # 0
+
+		# Test tokens transfer
+
+		assertErrors(self, [
+
+			["you have to use the contract specified", 
+			lambda: transfer(eosio_token, founder, eosioscrugex, "100.0000 EOS", "0")],
+
+			["you have to transfer specified amount for sale", 
+			lambda: transfer(token, founder, eosioscrugex, "101.0000 TEST", "0")]
+		])
+
+		# Transfer correctly
 		transfer(token, founder, eosioscrugex, "100.0000 TEST", "0")
+
+		# Transfer again
+
+		assertRaisesMessage(self, "you have already locked transferred tokens", 
+		lambda: transfer(token, founder, eosioscrugex, "100.0000 TEST", "0"))
+
+		# Other campaigns
 
 		assertRaisesMessage(self, "campaign has not started yet", 
 		lambda: transfer(eosio_token, investora, eosioscrugex, "2.5000 EOS", "0"))
 
-		newcampaign(eosioscrugex, founder) # 1
+		newcampaign(eosioscrugex, founder, supply="100.000 TEST") # 1, incorrect supply
+
+		assertRaisesMessage(self, "supply symbol mismatch", 
+		lambda: transfer(token, founder, eosioscrugex, "100.0000 TEST", "1"))
 
 		newcampaign(eosioscrugex, founder, duration=3000) # 2
 		transfer(token, founder, eosioscrugex, "100.0000 TEST", "2")
 
+		# Investments
+
 		assertErrors(self, [
 
-			["campaign has not been supplied with tokens to sale", 
+			["campaign has not been supplied with tokens to sell", 
 			lambda: transfer(eosio_token, investora, eosioscrugex, "2.5000 EOS", "1")],
 
 			["incorrectly formatted memo",

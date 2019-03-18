@@ -9,6 +9,8 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 	auto investmentSymbol = hardCap.symbol;
 	auto now = time_ms();
 	
+	// to-do check token exists and supply symbol matches
+	
 	eosio_assert(!kycEnabled, "kyc is not implemented yet");
 	
   eosio_assert(tokenContract != "eosio.token"_n && supplyForSale.symbol != EOS_SYMBOL, 

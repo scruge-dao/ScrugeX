@@ -28,6 +28,7 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
     eosio_assert(campaignItem->tokensReceived == false, "you have already locked transferred tokens");
     eosio_assert(campaignItem->status == Status::funding, "campaign has already started");
     eosio_assert(code == campaignItem->tokenContract, "you have to use the contract specified");
+    eosio_assert(quantity.symbol == campaignItem->supplyForSale.symbol, "supply symbol mismatch");
     eosio_assert(quantity == campaignItem->supplyForSale, "you have to transfer specified amount for sale");
     
     campaigns.modify(campaignItem, same_payer, [&](auto& r) {
@@ -42,7 +43,7 @@ void scrugex::transfer(name from, name to, asset quantity, string memo) {
     eosio_assert(code == "eosio.token"_n, "you have to use the system EOS token");
     
     eosio_assert(now > campaignItem->startTimestamp, "campaign has not started yet");
-    eosio_assert(campaignItem->tokensReceived, "campaign has not been supplied with tokens to sale");
+    eosio_assert(campaignItem->tokensReceived, "campaign has not been supplied with tokens to sell");
     eosio_assert(now < campaignItem->endTimestamp, "campaign has ended");
     eosio_assert(campaignItem->status == Status::funding, "campaign is not running");
     
