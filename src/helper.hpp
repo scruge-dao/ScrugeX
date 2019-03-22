@@ -242,7 +242,7 @@ void scrugex::_refund(uint64_t campaignId) {
       "ScrugeX: Tokens Return", campaignItem->tokenContract);
   
   // return money to investors
-  _pay(campaignItem->campaignId);
+  _schedulePay(campaignItem->campaignId);
 	
 } // void _refund
 

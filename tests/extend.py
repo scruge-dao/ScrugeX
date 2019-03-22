@@ -20,7 +20,7 @@ class Test(unittest.TestCase):
 
 	@classmethod
 	def setUpClass(cls):
-		SCENARIO("Test campaign flow")
+		SCENARIO("Test extend action")
 		reset()
 
 		create_master_account("master")
