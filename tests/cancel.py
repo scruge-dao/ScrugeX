@@ -102,7 +102,11 @@ class Test(unittest.TestCase):
 
 		# assert
 
-		table(eosioscrugex, "voters", "0")
+		# 0.001 is the ram comission for a test node
+
+		self.assertEqual(6.499, amount(table(eosioscrugex, "contribution", "0", row=0, element="quantity")))
+		self.assertEqual(2.499, amount(table(eosioscrugex, "contribution", "0", row=1, element="quantity")))
+		self.assertEqual(6.499, amount(table(eosioscrugex, "contribution", "0", row=2, element="quantity")))
 
 
 # main
