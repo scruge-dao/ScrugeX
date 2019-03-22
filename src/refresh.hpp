@@ -124,14 +124,14 @@ param _extendDeadlineVoting(const voting& votingItem, const campaigns& campaignI
 		milestones.modify(currentMilestoneItem, same_payer, [&](auto& r) {
 			r.duration *= 1.25;
 		});
-
-		// go back to milestone
-		campaigns.modify(campaignItem, same_payer, [&](auto& r) {
-			r.status = Status::milestone;
-		});
 		
 		// to-do correct timers?
 	}
+	
+	// go back to milestone
+	campaigns.modify(campaignItem, same_payer, [&](auto& r) {
+		r.status = Status::milestone;
+	});
 
 	DONE(1)
   
@@ -147,7 +147,7 @@ param _milestoneVoting(const voting& votingItem, const campaigns& campaignItem, 
   if (currentMilestoneItem->duration + currentMilestoneItem->startTimestamp > now) {
     PASS
   }
-	
+  
 	// voting is not active
   if (!votingItem.active ||
       votingItem.milestoneId != milestoneId ||

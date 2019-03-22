@@ -115,6 +115,13 @@ def take(eosioscrugex, account):
 		},
 		permission=[(account, Permission.ACTIVE)])
 
+def extend(eosioscrugex, account):
+	eosioscrugex.push_action("extend", 
+		{
+			"campaignId": 0
+		},
+		permission=[(account, Permission.ACTIVE)])
+
 def cancel(eosioscrugex, account, campaignId=0):
 	eosioscrugex.push_action("cancel",
 		{
@@ -158,7 +165,7 @@ def assertErrors(self, tests):
 def assertRaisesMessage(self, message, func):
 	with self.assertRaises(Error) as c:
 		func()
-	self.assertIn(message, c.exception.message)
+	self.assertIn(message.lower(), c.exception.message.lower())
 	print("+ Exception raised: \"%s\"" % message)
 
 def assertRaises(self, func):

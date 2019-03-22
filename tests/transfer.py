@@ -66,7 +66,7 @@ class Test(unittest.TestCase):
 
 	def test_invest(self):
 
-		newcampaign(eosioscrugex, founder, duration=60000, start=timeMs() + 5000) # 0
+		newcampaign(eosioscrugex, founder, duration=60000, start=timeMs() + 6000) # 0
 
 		# Test tokens transfer
 
