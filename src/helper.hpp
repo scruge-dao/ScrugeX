@@ -207,7 +207,8 @@ void scrugex::_startvote(uint64_t campaignId, uint8_t kind) {
 	
 	if (kind == VoteKind::extendDeadline) {
   	auto milestoneEndTimestamp = milestoneItem->startTimestamp + milestoneItem->duration;
-  	eosio_assert(milestoneEndTimestamp > end, "duration of voting to extend deadline can not overflow milestone duration");
+  	eosio_assert(milestoneEndTimestamp > end, 
+  	  "duration of voting to extend deadline can not overflow milestone duration");
 	}
 
 	// delete voters from previous voting

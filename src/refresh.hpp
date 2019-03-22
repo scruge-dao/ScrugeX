@@ -84,6 +84,11 @@ param _voting(const campaigns& campaignItem, campaigns_i& campaigns) {
   auto activeVoting = voting.get_index<"byactive"_n>();
   auto votingItem = activeVoting.begin();
   
+  if (campaignItem.status != Status::milestone &&
+      campaignItem.status != Status::activeVote) {
+    PASS
+  }
+  
   V_CHECK(_extendDeadlineVoting)
   
 	V_CHECK(_milestoneVoting)

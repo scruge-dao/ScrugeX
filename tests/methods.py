@@ -64,7 +64,7 @@ def newcampaign(eosioscrugex, founder,
 	SECOND = 1000
 
 	if start == None:
-		start = timeMs() + SECOND
+		start = timeMs() + 2 * SECOND
 
 	if milestones == None:
 		milestones = [
@@ -140,7 +140,7 @@ def amount(quantity):
 def table(contract, table, scope=None, row=0, element=None):
 	if scope == None:
 		scope = contract
-	data = contract.table(table, scope).json["rows"][0]
+	data = contract.table(table, scope).json["rows"][row]
 	if element != None:
 		return data[element]
 	else:
