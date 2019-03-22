@@ -126,10 +126,8 @@ param _extendDeadlineVoting(const voting& votingItem, const campaigns& campaignI
 
 		// extend this milestone duration
 		milestones.modify(currentMilestoneItem, same_payer, [&](auto& r) {
-			r.duration *= 1.25;
+			r.duration = r.duration * MILESTONE_EXTEND_MULTIIPLIER / 100;
 		});
-		
-		// to-do correct timers?
 	}
 	
 	// go back to milestone

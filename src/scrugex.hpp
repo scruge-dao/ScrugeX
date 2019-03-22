@@ -176,17 +176,17 @@ private:
 	
 	// to access kyc/aml table
 	
-	struct account {
-		uint64_t id;
-		name eosAccount;
+// 	struct account {
+// 		uint64_t id;
+// 		name eosAccount;
 
-		uint64_t primary_key() const { return eosAccount.value; }
-		uint64_t identifier() const { return id; }
-	};
+// 		uint64_t primary_key() const { return eosAccount.value; }
+// 		uint64_t identifier() const { return id; }
+// 	};
 
-	typedef multi_index<"accounts"_n, account,
-		indexed_by<"identifier"_n, const_mem_fun<account, uint64_t,
-      &account::identifier>>> accounts_i;
+// 	typedef multi_index<"accounts"_n, account,
+// 		indexed_by<"identifier"_n, const_mem_fun<account, uint64_t,
+//       &account::identifier>>> accounts_i;
       
   // to request ram price
   

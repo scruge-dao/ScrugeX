@@ -1,0 +1,544 @@
+{
+    "____comment": "This file was generated with eosio-abigen. DO NOT EDIT Fri Mar 22 17:51:38 2019",
+    "version": "eosio::abi/1.1",
+    "structs": [
+        {
+            "name": "buyram",
+            "base": "",
+            "fields": []
+        },
+        {
+            "name": "campaigns",
+            "base": "",
+            "fields": [
+                {
+                    "name": "status",
+                    "type": "uint8"
+                },
+                {
+                    "name": "campaignId",
+                    "type": "uint64"
+                },
+                {
+                    "name": "founderEosAccount",
+                    "type": "name"
+                },
+                {
+                    "name": "startTimestamp",
+                    "type": "uint64"
+                },
+                {
+                    "name": "endTimestamp",
+                    "type": "uint64"
+                },
+                {
+                    "name": "waitingEndTimestamp",
+                    "type": "uint64"
+                },
+                {
+                    "name": "tokenContract",
+                    "type": "name"
+                },
+                {
+                    "name": "supplyForSale",
+                    "type": "asset"
+                },
+                {
+                    "name": "tokensReceived",
+                    "type": "bool"
+                },
+                {
+                    "name": "softCap",
+                    "type": "asset"
+                },
+                {
+                    "name": "hardCap",
+                    "type": "asset"
+                },
+                {
+                    "name": "raised",
+                    "type": "asset"
+                },
+                {
+                    "name": "excessReturned",
+                    "type": "asset"
+                },
+                {
+                    "name": "initialFundsReleasePercent",
+                    "type": "uint64"
+                },
+                {
+                    "name": "maxUserContributionPercent",
+                    "type": "uint64"
+                },
+                {
+                    "name": "minUserContribution",
+                    "type": "asset"
+                },
+                {
+                    "name": "releasedPercent",
+                    "type": "uint64"
+                },
+                {
+                    "name": "backersCount",
+                    "type": "uint64"
+                },
+                {
+                    "name": "currentMilestone",
+                    "type": "uint8"
+                },
+                {
+                    "name": "kycEnabled",
+                    "type": "bool"
+                }
+            ]
+        },
+        {
+            "name": "cancel",
+            "base": "",
+            "fields": [
+                {
+                    "name": "eosAccount",
+                    "type": "name"
+                },
+                {
+                    "name": "campaignId",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "contribution",
+            "base": "",
+            "fields": [
+                {
+                    "name": "userId",
+                    "type": "uint64"
+                },
+                {
+                    "name": "eosAccount",
+                    "type": "name"
+                },
+                {
+                    "name": "quantity",
+                    "type": "asset"
+                },
+                {
+                    "name": "attemptedPayment",
+                    "type": "bool"
+                },
+                {
+                    "name": "isPaid",
+                    "type": "bool"
+                }
+            ]
+        },
+        {
+            "name": "excessfunds",
+            "base": "",
+            "fields": [
+                {
+                    "name": "quantity",
+                    "type": "asset"
+                },
+                {
+                    "name": "eosAccount",
+                    "type": "name"
+                },
+                {
+                    "name": "attemptedPayment",
+                    "type": "bool"
+                },
+                {
+                    "name": "isPaid",
+                    "type": "bool"
+                }
+            ]
+        },
+        {
+            "name": "extend",
+            "base": "",
+            "fields": [
+                {
+                    "name": "campaignId",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "information",
+            "base": "",
+            "fields": [
+                {
+                    "name": "campaignsCount",
+                    "type": "uint64"
+                },
+                {
+                    "name": "isPaused",
+                    "type": "bool"
+                },
+                {
+                    "name": "ramFund",
+                    "type": "asset"
+                }
+            ]
+        },
+        {
+            "name": "milestoneInfo",
+            "base": "",
+            "fields": [
+                {
+                    "name": "duration",
+                    "type": "uint64"
+                },
+                {
+                    "name": "fundsReleasePercent",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "milestones",
+            "base": "",
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "uint8"
+                },
+                {
+                    "name": "duration",
+                    "type": "uint64"
+                },
+                {
+                    "name": "fundsReleasePercent",
+                    "type": "uint64"
+                },
+                {
+                    "name": "startTimestamp",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "newcampaign",
+            "base": "",
+            "fields": [
+                {
+                    "name": "founderEosAccount",
+                    "type": "name"
+                },
+                {
+                    "name": "softCap",
+                    "type": "asset"
+                },
+                {
+                    "name": "hardCap",
+                    "type": "asset"
+                },
+                {
+                    "name": "supplyForSale",
+                    "type": "asset"
+                },
+                {
+                    "name": "tokenContract",
+                    "type": "name"
+                },
+                {
+                    "name": "initialFundsReleasePercent",
+                    "type": "uint64"
+                },
+                {
+                    "name": "kycEnabled",
+                    "type": "bool"
+                },
+                {
+                    "name": "maxUserContributionPercent",
+                    "type": "uint64"
+                },
+                {
+                    "name": "minUserContribution",
+                    "type": "asset"
+                },
+                {
+                    "name": "startTimestamp",
+                    "type": "uint64"
+                },
+                {
+                    "name": "campaignDuration",
+                    "type": "uint64"
+                },
+                {
+                    "name": "milestones",
+                    "type": "milestoneInfo[]"
+                }
+            ]
+        },
+        {
+            "name": "pause",
+            "base": "",
+            "fields": [
+                {
+                    "name": "value",
+                    "type": "bool"
+                }
+            ]
+        },
+        {
+            "name": "pay",
+            "base": "",
+            "fields": [
+                {
+                    "name": "campaignId",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "refresh",
+            "base": "",
+            "fields": []
+        },
+        {
+            "name": "refund",
+            "base": "",
+            "fields": [
+                {
+                    "name": "campaignId",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "send",
+            "base": "",
+            "fields": [
+                {
+                    "name": "eosAccount",
+                    "type": "name"
+                },
+                {
+                    "name": "campaignId",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "take",
+            "base": "",
+            "fields": [
+                {
+                    "name": "eosAccount",
+                    "type": "name"
+                },
+                {
+                    "name": "campaignId",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "vote",
+            "base": "",
+            "fields": [
+                {
+                    "name": "eosAccount",
+                    "type": "name"
+                },
+                {
+                    "name": "campaignId",
+                    "type": "uint64"
+                },
+                {
+                    "name": "vote",
+                    "type": "bool"
+                }
+            ]
+        },
+        {
+            "name": "voters",
+            "base": "",
+            "fields": [
+                {
+                    "name": "userId",
+                    "type": "uint64"
+                },
+                {
+                    "name": "voteId",
+                    "type": "uint8"
+                },
+                {
+                    "name": "vote",
+                    "type": "bool"
+                }
+            ]
+        },
+        {
+            "name": "voting",
+            "base": "",
+            "fields": [
+                {
+                    "name": "voteId",
+                    "type": "uint64"
+                },
+                {
+                    "name": "kind",
+                    "type": "uint8"
+                },
+                {
+                    "name": "milestoneId",
+                    "type": "uint8"
+                },
+                {
+                    "name": "voters",
+                    "type": "uint64"
+                },
+                {
+                    "name": "positiveVotes",
+                    "type": "uint64"
+                },
+                {
+                    "name": "votedWeight",
+                    "type": "uint64"
+                },
+                {
+                    "name": "positiveWeight",
+                    "type": "uint64"
+                },
+                {
+                    "name": "endTimestamp",
+                    "type": "uint64"
+                },
+                {
+                    "name": "startTimestamp",
+                    "type": "uint64"
+                },
+                {
+                    "name": "active",
+                    "type": "bool"
+                }
+            ]
+        },
+        {
+            "name": "zdestroy",
+            "base": "",
+            "fields": []
+        }
+    ],
+    "types": [],
+    "actions": [
+        {
+            "name": "buyram",
+            "type": "buyram",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "cancel",
+            "type": "cancel",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "extend",
+            "type": "extend",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "newcampaign",
+            "type": "newcampaign",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "pause",
+            "type": "pause",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "pay",
+            "type": "pay",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "refresh",
+            "type": "refresh",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "refund",
+            "type": "refund",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "send",
+            "type": "send",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "take",
+            "type": "take",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "vote",
+            "type": "vote",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "zdestroy",
+            "type": "zdestroy",
+            "ricardian_contract": ""
+        }
+    ],
+    "tables": [
+        {
+            "name": "campaigns",
+            "type": "campaigns",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "contribution",
+            "type": "contribution",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "excessfunds",
+            "type": "excessfunds",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "information",
+            "type": "information",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "milestones",
+            "type": "milestones",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "voters",
+            "type": "voters",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "voting",
+            "type": "voting",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        }
+    ],
+    "ricardian_clauses": [],
+    "variants": [],
+    "abi_extensions": []
+}

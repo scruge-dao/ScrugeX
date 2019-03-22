@@ -21,6 +21,9 @@ const uint64_t MILESTONE_VOTING_THRESHOLD = 50;
 // threshold of votes for extending deadline
 const uint64_t EXTEND_VOTING_THRESHOLD = 50; 
 
+// duration is multiplied by this and divided by 100, so this is in %
+const uint64_t MILESTONE_EXTEND_MULTIIPLIER = 125;
+
 // duration to wait for founder input after failed milestone voting
 const uint64_t WAITING_TIME = 3 * DAY;
 

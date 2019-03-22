@@ -40,4 +40,3 @@
 # Python
 __pycache__
 *.tmp
-src/build/scrugex.abi

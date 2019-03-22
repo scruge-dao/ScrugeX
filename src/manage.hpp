@@ -51,14 +51,14 @@ void scrugex::buyram() {
   require_auth(_self);
   
   information_i information(_self, _self.value);
-  auto& infoItem = *information.begin();
+  auto infoItem = information.begin();
   
-  eosio_assert(infoItem.ramFund.amount > 0, "ram fund is empty");
+  eosio_assert(infoItem != information.end(), "ram fund is empty");
+  eosio_assert(infoItem->ramFund.amount > 0, "ram fund is empty");
 
   action(
-		permission_level{ _self, "active"_n },
-		"eosio"_n, "buyram"_n,
-		make_tuple(_self, _self, infoItem.ramFund)
+		permission_level{ _self, "active"_n }, "eosio"_n, "buyram"_n,
+		make_tuple(_self, _self, infoItem->ramFund)
 	).send();
 	
   information.modify(infoItem, same_payer, [&](auto& r) {

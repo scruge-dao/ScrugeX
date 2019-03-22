@@ -108,7 +108,9 @@ bool scrugex::_willRefundExcessiveFunds(uint64_t campaignId) {
     auto raised = campaignItem->raised;
     auto newRaised = campaignItem->raised;
   	
-  	// to-do loop sorted contributions again and break after dealing with all
+  	// to-do this loops through all contributions which can be quite a lot 
+  	// needs to be optimized, so only values changed in this round will be paid out
+  	// maybe we can save round time or nonce and then check with it
     for (auto& item : contributions) {
   		if (item.quantity < e) {
         continue;

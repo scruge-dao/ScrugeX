@@ -68,6 +68,7 @@ void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap,
 		r.tokenContract = tokenContract;
 		r.tokensReceived = false;
 		r.waitingEndTimestamp = 0;
+		r.releasedPercent = 0;
 	});
 	
 	// update campaigns count
