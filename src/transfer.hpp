@@ -1,3 +1,7 @@
+// Copyright © Scruge 2019.
+// This file is part of ScrugeX.
+// Created by Yaroslav Erohin.
+
 void scrugex::transfer(name from, name to, asset quantity, string memo) {
 	if (to != _self) { return; }
 	

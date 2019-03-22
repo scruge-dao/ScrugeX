@@ -1,3 +1,7 @@
+// Copyright © Scruge 2019.
+// This file is part of ScrugeX.
+// Created by Yaroslav Erohin.
+
 void scrugex::_pay(uint64_t campaignId) {
 	action(
 		permission_level{ _self, "active"_n },

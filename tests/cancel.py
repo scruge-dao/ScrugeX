@@ -1,3 +1,7 @@
+# Copyright © Scruge 2019.
+# This file is part of ScrugeX.
+# Created by Yaroslav Erohin.
+
 import unittest
 from eosfactory.eosf import *
 from methods import *
@@ -20,7 +24,7 @@ class Test(unittest.TestCase):
 
 	@classmethod
 	def setUpClass(cls):
-		SCENARIO("Test campaign flow")
+		SCENARIO("Test cancel action")
 		reset()
 
 		create_master_account("master")

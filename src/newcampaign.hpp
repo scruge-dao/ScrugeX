@@ -1,3 +1,7 @@
+// Copyright © Scruge 2019.
+// This file is part of ScrugeX.
+// Created by Yaroslav Erohin.
+
 void scrugex::newcampaign(name founderEosAccount, asset softCap, asset hardCap, 
 		asset supplyForSale, name tokenContract, uint64_t initialFundsReleasePercent, bool kycEnabled,
 		uint64_t maxUserContributionPercent, asset minUserContribution,

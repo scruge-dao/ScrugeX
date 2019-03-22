@@ -1,3 +1,7 @@
+// Copyright © Scruge 2019.
+// This file is part of ScrugeX.
+// Created by Yaroslav Erohin.
+
 #include <cmath>
 #include <eosiolib/transaction.hpp>
 #include <eosiolib/asset.hpp>

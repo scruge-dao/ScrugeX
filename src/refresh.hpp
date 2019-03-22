@@ -1,3 +1,7 @@
+// Copyright © Scruge 2019.
+// This file is part of ScrugeX.
+// Created by Yaroslav Erohin.
+
 #define PASS return make_tuple(0, RefreshAction::pass);
 #define SKIP return make_tuple(0, RefreshAction::skip);
 #define DONE_ return make_tuple(0, RefreshAction::done);

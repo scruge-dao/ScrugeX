@@ -1,3 +1,7 @@
+// Copyright © Scruge 2019.
+// This file is part of ScrugeX.
+// Created by Yaroslav Erohin.
+
 void scrugex::extend(uint64_t campaignId) {
   _assertPaused();
 	campaigns_i campaigns(_self, _self.value);

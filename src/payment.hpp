@@ -1,3 +1,7 @@
+// Copyright © Scruge 2019.
+// This file is part of ScrugeX.
+// Created by Yaroslav Erohin.
+
 void scrugex::take(name eosAccount, uint64_t campaignId) {
   require_auth(eosAccount);
 	_send(eosAccount, campaignId);

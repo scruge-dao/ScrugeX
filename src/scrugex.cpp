@@ -1,3 +1,7 @@
+// Copyright © Scruge 2019.
+// This file is part of ScrugeX.
+// Created by Yaroslav Erohin.
+
 #include "scrugex.hpp"
 #include "debug.hpp"
 #include "helper.hpp"

@@ -1,3 +1,7 @@
+// Copyright © Scruge 2019.
+// This file is part of ScrugeX.
+// Created by Yaroslav Erohin.
+
 void scrugex::vote(name eosAccount, uint64_t campaignId, bool vote) {
   _assertPaused();
 	require_auth(eosAccount);
