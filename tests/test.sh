@@ -3,10 +3,10 @@
 # Created by Yaroslav Erohin.
 
 #!/bin/bash
-python simple.py &&
-python newcampaign.py &&
-python transfer.py &&
-python vote.py &&
-python extend.py &&
-python refund.py &&
-python cancel.py 
+python3 simple.py &&
+python3 newcampaign.py &&
+python3 transfer.py &&
+python3 vote.py &&
+python3 extend.py &&
+python3 refund.py &&
+python3 cancel.py 

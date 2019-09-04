@@ -1,3 +1,4 @@
+# coding: utf8
 # Copyright © Scruge 2019.
 # This file is part of ScrugeX.
 # Created by Yaroslav Erohin.
